@@ -30,7 +30,7 @@ export default function AuthorDetailPage() {
       {langs.map(lang => {
         const items = more.filter(c => c.lang === lang)
         return (
-          <Section key={lang} title={t('Weitere Serien bei Audible, {{v0}}', { v0: lang === 'en' ? 'Englisch' : 'Deutsch' })}
+          <Section key={lang} title={t('Weitere Serien bei Audible, {{v0}}', { v0: lang === 'en' ? t('Englisch') : t('Deutsch') })}
             hint={a.catalog_fetched ? t('Stand {{v0}}', { v0: fmtDate(a.catalog_fetched) }) : t('Autorenkatalog noch nicht geprüft')}>
             {items.length === 0 ? <p className="text-sm text-muted">{a.catalog_fetched ? t('Keine weiteren Serien in dieser Sprache gefunden.') : t('Die Prüfung läuft unter Aufgaben, «Autorenkatalog prüfen».')}</p> : (
               <ul className={GRID}>

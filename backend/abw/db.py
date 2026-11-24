@@ -153,6 +153,8 @@ CREATE TABLE IF NOT EXISTS toread_rec (
     id INTEGER PRIMARY KEY, from_user INTEGER NOT NULL, to_user INTEGER NOT NULL, kind TEXT NOT NULL, ref_id INTEGER NOT NULL,
     created TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'open', UNIQUE(from_user, to_user, kind, ref_id)
 );
+-- Wer wem empfehlen darf, wenn die Einstellung rec_mode auf «custom» steht
+CREATE TABLE IF NOT EXISTS rec_allow (from_user INTEGER NOT NULL, to_user INTEGER NOT NULL, PRIMARY KEY(from_user, to_user));
 -- Vorschlag «nicht auf die Liste»: ausgeblendet, solange book_id der nächste Band ist
 CREATE TABLE IF NOT EXISTS toread_dismiss (user_id INTEGER NOT NULL, edition_id INTEGER NOT NULL, book_id INTEGER, created TEXT NOT NULL, PRIMARY KEY(user_id, edition_id));
 -- Drei Serien aus Entdecken unter der Liste: «Nicht auf die Liste» (Buch- und Serien-ASIN)
@@ -267,7 +269,7 @@ def migrate_users(c) -> None:
 
 
 DEFAULTS = {"auto_search": "0", "auto_import": "0", "auto_batch": "10", "auto_cleanup": "0", "auto_convert": "0", "auto_chapters": "0", "notify": "0", "auto_ebook": "0", "auto_ebook_upcoming": "0", "auto_ebook_listening": "1", "notify_ebook": "0", "auto_author_series": "0", "auto_integrity": "0",
-            "setup_done": "0", "auth_user": "", "auth_hash": "", "goodreads_user": "", "goodreads_shelf": "to-read"}
+            "setup_done": "0", "rec_mode": "admins", "auth_user": "", "auth_hash": "", "goodreads_user": "", "goodreads_shelf": "to-read"}
 
 
 def setting(key: str) -> str:

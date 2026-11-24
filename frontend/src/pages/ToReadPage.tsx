@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { ArrowDown, ArrowDownToLine, ArrowUp, ArrowUpToLine, Check, GripVertical, Headphones, Play, Send, Sparkles, ThumbsUp, X } from 'lucide-react'
 import { api, fmtDate, fmtDateTime, fmtSeriesSize, useData, type BookState } from '../api'
 import { Badge, Cover, Empty, ErrorBox, LangTag, Page, SkeletonGrid } from '../ui'
-import { useAdmin } from '../session'
 import { locale, t } from '../i18n'
 
 interface TBook {
@@ -311,9 +310,8 @@ function RecommendDialog({ book, onClose, onSent }: { book: Heard; onClose: () =
 /** Gehörte Bücher, zuletzt gehörtes zuerst, mit Knopf «Weiterempfehlen». */
 function RecommendTab() {
   const { data, error, loading, reload } = useData<Heard[]>('/toread/heard')
-  const admin = useAdmin()
-  // Benutzer haben keine Auswahl: sie empfehlen direkt dem Administrator
-  const fixed = useData<{ id: number; name: string }[]>(admin ? null : '/toread/users').data
+  // Wem man empfehlen darf, legt der Administrator fest. Bei genau einem Empfänger gibt es keine Auswahl.
+  const fixed = useData<{ id: number; name: string }[]>('/toread/users').data
   const [busy, setBusy] = useState<number | null>(null)
   const [open, setOpen] = useState<Heard | null>(null)
   const [shown, setShown] = useState(50)
@@ -322,6 +320,7 @@ function RecommendTab() {
   if (loading && !data) return <SkeletonGrid n={6} />
   const list = data ?? []
   const to = fixed ?? []
+  const choose = to.length > 1
   const direct = async (b: Heard) => {
     setBusy(b.id); setSent(null)
     try {
@@ -329,10 +328,11 @@ function RecommendTab() {
       setSent(t('«{{v0}}» {{v1}} empfohlen.', { v0: b.series ?? b.title, v1: to.map(u => u.name).join(', ') })); reload()
     } catch (e) { setSent((e as Error).message) } finally { setBusy(null) }
   }
+  if (fixed && !fixed.length) return <Empty title={t('Weiterempfehlen ist nicht freigegeben')} text={t('Der Administrator hat für dich keine Empfänger freigegeben.')} />
   if (!list.length) return <Empty title={t('Noch nichts gehört')} text={t('Sobald du ein Buch fertig gehört hast, kannst du seine Serie hier weiterempfehlen.')} />
   return (
     <>
-      <p className="mb-3 text-sm text-muted">{t('Serien, aus denen du Bände fertig gehört hast, zuletzt gehörte zuerst. Empfohlen wird die ganze Serie')}{admin ? '' : t(', an {{v0}}', { v0: to.map(u => u.name).join(', ') || 'den Administrator' })}.</p>
+      <p className="mb-3 text-sm text-muted">{t('Serien, aus denen du Bände fertig gehört hast, zuletzt gehörte zuerst. Empfohlen wird die ganze Serie')}{choose ? '' : t(', an {{v0}}', { v0: to.map(u => u.name).join(', ') })}.</p>
       {sent && <p role="status" className="mb-3 inline-flex items-center gap-1.5 text-sm" style={{ color: 'var(--ok)' }}><Check size={15} aria-hidden />{sent}</p>}
       <ul className="overflow-hidden rounded-xl border border-line bg-surface">
         {list.slice(0, shown).map(b => (
@@ -342,13 +342,13 @@ function RecommendTab() {
               <p className="truncate text-sm font-semibold">
                 {b.series_id ? <Link to={`/serie/${b.series_id}`} className="hover:text-accent">{b.series ?? b.title}</Link> : b.series ?? b.title}
               </p>
-              <p className="truncate text-xs text-muted">{[b.author, b.series && t('{{v0}} {{v1}} gehört', { v0: b.count, v1: b.count === 1 ? 'Band' : 'Bände' }), b.series && b.series_books && t('Serie: {{v0}}', { v0: fmtSeriesSize(b.series_books, b.series_hours ? b.series_hours * 60 : null) })].filter(Boolean).join(' · ')}</p>
+              <p className="truncate text-xs text-muted">{[b.author, b.series && t('{{v0}} {{v1}} gehört', { v0: b.count, v1: b.count === 1 ? t('Band') : t('Bände') }), b.series && b.series_books && t('Serie: {{v0}}', { v0: fmtSeriesSize(b.series_books, b.series_hours ? b.series_hours * 60 : null) })].filter(Boolean).join(' · ')}</p>
               <p className="truncate text-xs text-faint">
                 {t('Zuletzt')}{' '}{b.series && b.sequence ? t('Band {{v0}} ', { v0: b.sequence }) : ''}{t('gehört')}{' '}{fmtDateTime(b.finished_at)}{b.sent_to.length > 0 ? t(' · empfohlen an {{v0}}', { v0: b.sent_to.join(', ') }) : ''}
-                {admin && b.blocked.length > 0 && t(' · nicht möglich bei {{v0}}', { v0: b.blocked.map(x => x.name).join(', ') })}
+                {choose && b.blocked.length > 0 && t(' · nicht möglich bei {{v0}}', { v0: b.blocked.map(x => x.name).join(', ') })}
               </p>
             </div>
-            {admin ? (
+            {choose ? (
               <button type="button" onClick={() => setOpen(b)}
                 className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold hover:border-accent hover:text-accent">
                 <ThumbsUp size={14} aria-hidden /><span className="hidden sm:inline">{t('Weiterempfehlen')}</span><span className="sm:hidden">{t('Empfehlen')}</span>

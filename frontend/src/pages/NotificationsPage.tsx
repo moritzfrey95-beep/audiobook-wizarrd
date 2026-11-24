@@ -104,7 +104,7 @@ export default function NotificationsPage() {
   return (
     <Page title={t('Benachrichtigungen')}
       subtitle={marked === null ? t('Neues zu deinen markierten Serien und Autoren')
-        : t('Neues zu deinen markierten Serien und Autoren ({{v0}} {{v1}}, {{v2}} {{v3}})', { v0: follows!.series.length, v1: follows!.series.length === 1 ? 'Serie' : 'Serien', v2: follows!.authors.length, v3: follows!.authors.length === 1 ? 'Autor' : 'Autoren' })}
+        : t('Neues zu deinen markierten Serien und Autoren ({{v0}} {{v1}}, {{v2}} {{v3}})', { v0: follows!.series.length, v1: follows!.series.length === 1 ? t('Serie') : t('Serien'), v2: follows!.authors.length, v3: follows!.authors.length === 1 ? t('Autor') : t('Autoren') })}
       actions={view !== 'marked' && data && data.total > 0 ? (
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => read()} disabled={!data.unread}><CheckCheck size={15} aria-hidden />{t('Alle als gelesen markieren')}</Button>

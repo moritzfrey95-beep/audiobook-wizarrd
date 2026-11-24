@@ -145,7 +145,7 @@ export function BookCard({ b, absUrl, lang, canMark, onSearch, onChange, note }:
               className="line-clamp-2 font-[family-name:var(--font-sans)] text-[15px] font-semibold leading-snug tracking-normal">{b.title}</h3>
           </div>
           {link && (
-            <a href={link} target="_blank" rel="noreferrer" aria-label={t('{{v0}} {{v1}} öffnen', { v0: b.title, v1: b.abs_item_id ? 'in Audiobookshelf' : 'bei Audible' })}
+            <a href={link} target="_blank" rel="noreferrer" aria-label={t('{{v0}} {{v1}} öffnen', { v0: b.title, v1: b.abs_item_id ? t('in Audiobookshelf') : t('bei Audible') })}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-faint hover:text-text"><ExternalLink size={15} aria-hidden /></a>
           )}
         </div>
@@ -361,7 +361,7 @@ export default function SeriesDetailPage() {
   const findEbooks = async () => {
     try {
       const r = await api<{ total: number }>(`/series/${s.id}/ebooks`, { method: 'POST' })
-      setEbookMsg(r.total ? t('EPUB-Suche läuft im Hintergrund für {{v0}} {{v1}}. Sichere Treffer werden geladen, geprüft und in den Buchordner gelegt.', { v0: r.total, v1: r.total === 1 ? 'Band' : 'Bände' }) : t('Alle vorhandenen Bände haben schon ein EPUB oder es lädt gerade.'))
+      setEbookMsg(r.total ? t('EPUB-Suche läuft im Hintergrund für {{v0}} {{v1}}. Sichere Treffer werden geladen, geprüft und in den Buchordner gelegt.', { v0: r.total, v1: r.total === 1 ? t('Band') : t('Bände') }) : t('Alle vorhandenen Bände haben schon ein EPUB oder es lädt gerade.'))
     } catch (e) { setEbookMsg((e as Error).message) }
   }
   const refresh = async () => { setRefreshing(true); try { await api(`/series/${s.id}/refresh`, { method: 'POST' }); reload() } finally { setRefreshing(false) } }

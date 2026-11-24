@@ -204,6 +204,7 @@ def delete(user_id: int) -> None:
         c.execute(f"DELETE FROM {table} WHERE user_id=?", (user_id,))
     c.execute("DELETE FROM wishlist_item WHERE source=?", (f"gr{user_id}",))
     c.execute("DELETE FROM toread_rec WHERE from_user=? OR to_user=?", (user_id, user_id))
+    c.execute("DELETE FROM rec_allow WHERE from_user=? OR to_user=?", (user_id, user_id))
     c.execute("DELETE FROM user WHERE id=?", (user_id,))
 
 

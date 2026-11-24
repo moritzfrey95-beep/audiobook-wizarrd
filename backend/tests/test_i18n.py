@@ -23,3 +23,12 @@ def test_fehler_der_schnittstelle_auf_englisch(monkeypatch):
     c = TestClient(app)
     assert c.post("/api/config/test", json={"service": "x"}, headers={"X-ABW-Lang": "en"}).json()["detail"] == "Unknown service"
     assert c.post("/api/config/test", json={"service": "x"}).json()["detail"] == "Unbekannter Dienst"
+
+
+def test_meldungen_uebersetzt():
+    from abw import i18n
+    assert i18n.tr("Neuer Band angekündigt", "en") == "New volume announced"
+    assert i18n.tr("The Expanse, Band 10: Leviathan Falls (erscheint am 01.02.2027)", "en") == "The Expanse, volume 10: Leviathan Falls (out on 01.02.2027)"
+    assert i18n.tr("Dune, Band 2: Dune Messiah", "en") == "Dune, volume 2: Dune Messiah"
+    assert i18n.tr("Alex empfiehlt dir «Red Rising»", "en") == "Alex recommends “Red Rising” to you"
+    assert i18n.tr("Neue Serie von Brandon Sanderson", "en") == "New series by Brandon Sanderson"

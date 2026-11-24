@@ -158,7 +158,7 @@ export default function ListeningPage() {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Tile label={t('Hörzeit')} value={fmtBig(s.seconds)} sub={trend(s.seconds, s.prev_seconds, label)} />
           <Tile label={t('Bücher')} value={fmtNum(s.books)} sub={t('{{v0}} beendet, {{v1}} Sitzungen', { v0: fmtNum(s.finished), v1: fmtNum(s.sessions) })} />
-          <Tile label={t('Tage mit Hören')} value={`${s.days}/${d.range.days}`} sub={t('Längste Folge im Zeitraum: {{v0}} {{v1}}{{v2}}', { v0: s.streak, v1: s.streak === 1 ? 'Tag' : 'Tage', v2: s.current_streak != null && one ? `, aktuell ${s.current_streak}` : '' })} />
+          <Tile label={t('Tage mit Hören')} value={`${s.days}/${d.range.days}`} sub={t(s.streak === 1 ? 'Längste Folge im Zeitraum: 1 Tag{{v2}}' : 'Längste Folge im Zeitraum: {{v0}} Tage{{v2}}', { v0: s.streak, v2: s.current_streak != null && one ? t(', aktuell {{v0}}', { v0: s.current_streak }) : '' })} />
           <Tile label={t('Pro Tag mit Hören')} value={s.days ? fmtBig(s.seconds / s.days) : '–'} sub={one ? t('Zuletzt gehört: {{v0}}', { v0: one.last ? fmtWhen(one.last) : 'nie' }) : t('{{v0}} von {{v1}} Konten haben gehört', { v0: s.listeners, v1: d.users.length })} />
         </div>
         {!empty && (

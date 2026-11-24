@@ -775,7 +775,10 @@ def follow_set(body: Follow, request: Request):
 
 @app.get("/api/notifications")
 def notification_list(request: Request, limit: int = 50, offset: int = 0, unread: int = 0):
-    return notifications.listing(me(request)["id"], max(1, min(limit, 200)), max(0, offset), bool(unread))
+    out = notifications.listing(me(request)["id"], max(1, min(limit, 200)), max(0, offset), bool(unread))
+    for n in out["items"]:  # gespeichert wird Deutsch, angezeigt in der Sprache der Oberfläche
+        n["title"], n["body"] = i18n.tr(n["title"]), i18n.tr(n["body"])
+    return out
 
 
 class Read(BaseModel):
@@ -1518,6 +1521,25 @@ def toread_heard(request: Request):
 @app.get("/api/toread/users")
 def toread_users(request: Request):
     return toread.users(me(request)["id"])
+
+
+class RecRules(BaseModel):
+    mode: str
+    allow: list[list[int]] | None = None
+
+
+@app.get("/api/recommend/rules")
+def recommend_rules():
+    return toread.rules()
+
+
+@app.put("/api/recommend/rules")
+def recommend_rules_save(body: RecRules):
+    try:
+        toread.set_rules(body.mode, body.allow)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return toread.rules()
 
 
 @app.post("/api/toread/recommend")

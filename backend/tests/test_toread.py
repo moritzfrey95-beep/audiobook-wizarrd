@@ -306,3 +306,33 @@ def test_drei_vorschlaege_aus_entdecken(monkeypatch):
     assert [x["asin"] for x in p] == ["A1", "A3", "E1"] and p[-1]["explore"] and len({x["genre"] for x in p}) == 3
     toread.decide_pick(1, {"asin": "A1", "series_asin": "SA1"}, "no")
     assert [x["asin"] for x in toread.picks(1)] == ["A2", "A3", "E1"]  # nächster LitRPG rückt nach
+
+
+def test_empfehlungsrechte_einstellbar():
+    c, eid, ids, single = _setup()
+    _users(c)
+    try:
+        c.execute("UPDATE user SET role='user' WHERE id=2")
+        c.execute("INSERT INTO user(id, name, hash, role, created) VALUES(3,'Karl','x','user','2026-01-01')")
+        from abw import auth
+        client = TestClient(api.app, cookies={"abw_session": auth.open_session(1)})
+        assert client.get("/api/recommend/rules").json()["mode"] == "admins"
+        # alle an alle
+        assert client.put("/api/recommend/rules", json={"mode": "all"}).status_code == 200
+        assert [u["name"] for u in toread.users(2)] == ["Karl", "Max"]
+        # nach Tabelle: Ada nur an Karl, Max an niemanden; Paare mit sich selbst oder unbekannten Benutzern fallen weg
+        r = client.put("/api/recommend/rules", json={"mode": "custom", "allow": [[2, 3], [2, 2], [2, 99]]}).json()
+        assert r["allow"] == [[2, 3]]
+        assert toread.users(2) == [{"id": 3, "name": "Karl"}] and toread.users(1) == []
+        c.execute("INSERT INTO user_progress VALUES(2,?,1,1,'2026-11-19T00:00:00+00:00')", (ids[0],))
+        assert toread.recommend(2, ids[0], [1, 3]) == 1
+        # aus: niemand
+        client.put("/api/recommend/rules", json={"mode": "off"})
+        assert toread.users(1) == [] and toread.users(2) == []
+        assert client.put("/api/recommend/rules", json={"mode": "xyz"}).status_code == 400
+        assert not api.USER_READ.match("/api/recommend/rules")
+    finally:
+        c.execute("DELETE FROM user")
+        c.execute("DELETE FROM rec_allow")
+        c.execute("DELETE FROM session")
+        c.execute("DELETE FROM setting WHERE key='rec_mode'")

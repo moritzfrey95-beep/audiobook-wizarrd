@@ -259,7 +259,7 @@ function AudibleSearch({ q, lang, hide, setHide }: { q: string; lang: Lang } & H
   const listed = useContext(ToReadAsins).hide
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />
   if (loading && !data) return <SkeletonGrid />
-  if (!data?.length) return <Empty title={t('Keine Treffer bei Audible')} text={t('Zu «{{v0}}» hat Audible nichts in {{v1}} gefunden. Versuche es mit weniger Wörtern, nur dem Titel oder nur dem Autor.', { v0: q, v1: lang === 'de' ? 'Deutsch' : lang === 'en' ? 'Englisch' : 'Deutsch oder Englisch' })} />
+  if (!data?.length) return <Empty title={t('Keine Treffer bei Audible')} text={t('Zu «{{v0}}» hat Audible nichts in {{v1}} gefunden. Versuche es mit weniger Wörtern, nur dem Titel oder nur dem Autor.', { v0: q, v1: lang === 'de' ? 'Deutsch' : lang === 'en' ? t('Englisch') : t('Deutsch oder Englisch') })} />
   const list = data.filter(visible(hide, listed))
   return (
     <>

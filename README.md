@@ -7,7 +7,7 @@ A self-hosted companion for [Audiobookshelf](https://www.audiobookshelf.org/) �
 
 [![CI](https://github.com/moritzfrey95-beep/audiobook-wizarrd/actions/workflows/ci.yml/badge.svg)](https://github.com/moritzfrey95-beep/audiobook-wizarrd/actions/workflows/ci.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.5.0-8b74ff)
+![Version](https://img.shields.io/badge/version-0.6.0-8b74ff)
 ![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)
 ![Languages](https://img.shields.io/badge/UI-English%20%7C%20Deutsch-555)
 
@@ -38,38 +38,78 @@ Everything runs on your own server. ABW talks only to services you run yourself 
 
 ## ✨ Features
 
-### 📚 Library overview
-- **Every series with all its volumes** from the public Audible catalogue (audible.com and audible.de), with covers, release dates and runtimes
+ABW is organised like your day with audiobooks: **Listen**, **Library**, **Discover**, **New**, **Recap** and – for admins – the **Workshop**.
+
+### 🎧 Listen – what's next, for everyone in the house
+- **To Read list** per user, one line per series: the next volume, progress across the whole series (volumes and hours) and an
+  **estimated finish date** based on your own listening pace
+- **Fills itself:** finish a volume and the series moves up with the next one; reorder by hand, put things at the top or bottom
+- **Recommend to others:** pick a series you've finished and send it to another user – it shows up in their To Read, where they
+  decide *top*, *bottom* or *not on my list*. ABW won't let you recommend what the other person already heard or has listed
+- **Admins decide who may recommend to whom:** only to admins, everyone to everyone, a custom *from → to* table, or off
+- **Rate what you heard** with 1–5 stars (whole series at once or per volume) – ABW reminds you after you finish a book
+- **Mark as listened** in ABW, synced back to Audiobookshelf for every linked account
+- Three hand-picked **suggestions from Discover** below the list: three genres, one of them "something different"
+
+### 📚 Library – every series, complete
+- **Every series with all its volumes** from the public Audible catalogue (audible.com and audible.de): covers, release dates, runtimes, narrators
 - **Status at a glance:** complete, incomplete, new book coming, actively searching, downloading, in review
-- **English and German editions** of the same series on one card – plus alternative recordings (full cast, other narrators)
-- **Standalone books** grouped per author, **omnibus editions** recognised and split into volumes
-- Filters by language, status, genre and tag; sort by name, recently added, missing volumes, next release, length
+- **English and German editions on one card**, plus alternative recordings (full cast, dramatized, other narrators) as their own rows
+- **Standalone books** grouped per author, **omnibus editions** recognised and not counted as missing volumes
+- **Filters** by language, status, genre, tag and who requested it; **sort** by name, recently added, missing volumes, next release, length
+- **Series page:** every volume with your rating, listened state, EPUB, a manual or automatic search button and per-series automation
+- **Authors:** all authors with books in German and English, and how many more series Audible has from them
 
-### 🔎 Search & download
-- Search via **[Prowlarr](https://prowlarr.com/)** across your Usenet and torrent indexers
-- Download via **SABnzbd** (or anything with its API) and **qBittorrent**, each into its own folder
-- **Scoring with reasons:** every result is rated *sure*, *possible* or *rejected* – and ABW tells you why
+### 🧭 Discover – find your next series
+- **For you:** suggestions built from what you finished and how you rated it – more volumes heard and more stars count more,
+  low ratings push similar titles down. Sub-genres like LitRPG, Cozy or Isekai come from Audible and (optionally) Goodreads
+- **From your authors:** series by authors you already listen to that are not in your library yet
+- **Top lists:** Audible bestsellers and new releases per language, and a **free search** of the Audible catalogue
+- One click on **Add** puts a title or series into the library as *missing* (searched with priority); **Add to To Read** also queues it for you
+- **Goodreads:** link your shelf (or import the CSV export) – new books on it are added and searched automatically
+
+### 🔔 New – never miss a release
+- **Follow** series and authors with the bell: get notified when a new volume is announced, released, or lands in your library,
+  and when an author starts a new series
+- **Notifications** in the app, as **browser push** on your phone, or via [ntfy](https://ntfy.sh)
+- **Release calendar** of upcoming volumes for the series you follow (or all languages)
+
+### 📊 Recap – your listening, in numbers
+- **Listening history** from Audiobookshelf's sessions: week, month and year recaps per account or for everyone, compared with the
+  previous period – listening time, books, days, streaks, most listened, longest session, devices and apps, a weekday × hour heat map,
+  and books that were started but left lying
+- **Statistics:** series, books, runtime, storage, missing and announced volumes, languages compared, longest series, authors and
+  narrators by runtime, best authors / narrators / series by stars, star distribution, who requested what, and ABW's own activity
+  in the last 24 hours and 7 days
+- **My ratings** and a **top list per tag** (your best LitRPG, your best Cozy Fantasy …)
+
+### 🔎 Workshop – search, download, check, import (admins)
+- Search via **[Prowlarr](https://prowlarr.com/)** across your Usenet and torrent indexers, with several query variants per volume
+- Download via **SABnzbd** (or anything with its API) and **qBittorrent**, each into its own folder; finished torrents are stopped
+- **Scoring with reasons:** every result is rated *sure*, *possible* or *rejected* – and ABW tells you why (title, volume number,
+  author, narrator, language, size, omnibus, uploaded before release …)
 - **Guided search** for manual control, **automatic search** for the boring part (with back-off: 1, 2, 4, 7 days)
-- Optional **e-books** (EPUB) for your audiobooks, placed next to them for Audiobookshelf's e-reader
-
-### ✅ Arrival check & import
-- Every download is **checked before it touches your library:** runtime vs. Audible, tags, file integrity, narrator
-- Optional **speech recognition** of the first minute (faster-whisper): is it really *this* book, in *this* language?
-- **Import** into the right library folder (`Series/Book X - Title`, next to the volumes you already have), with metadata for Audiobookshelf
-- **Better editions replace worse ones** automatically (old files go to a trash folder, never deleted directly)
-- Optional **MP3 → M4B** conversion with chapters, **chapters from Audible**, nightly **integrity scan** for broken files
-
-### 👥 For the whole household
-- **Multiple users** – or simply sign in with your Audiobookshelf account
-- Personal **To Read** lists, **ratings**, **recommendations** ("For you", "From your authors", top lists)
-- Requests from users are highlighted and tagged in Audiobookshelf (*requested by …*)
-- **Listening history & statistics**, a release **calendar**, **notifications** in the app, via browser push or [ntfy](https://ntfy.sh)
-- Installable as an **app** (PWA), works great on the phone
+- **Arrival check** before anything touches your library: files, runtime vs. Audible (with a diagnosis: omnibus, other recording,
+  incomplete), tags, and optionally **speech recognition** of the spoken intro (faster-whisper)
+- **Omnibus downloads are split** into one folder per volume, by volume number or by Audible runtimes
+- **Import** into the right folder (`Series/Book X - Title`), next to the volumes you already have; Audiobookshelf is told to rescan
+  and the book is matched with Audible by ASIN
+- **Better editions replace worse ones** automatically; old files go to a **trash folder**, nothing is deleted without a button press
+- **Review** page for everything that needs a decision: import anyway, discard, check again, pick a result, link language editions,
+  split omnibuses already in your library
+- Optional **e-books** (EPUB) via Usenet, EBookBay or Internet Archive, checked (title, author, language) and placed next to the
+  audiobook – even before the audiobook is released, if you like
+- Library care: optional **MP3 → M4B** conversion with chapters, **chapters from Audible** for single-file books, **splitting
+  omnibus files** already in your library at chapter borders, and a nightly **integrity scan** that finds broken files
+  (e.g. zero-filled gaps from unfinished torrents) and searches for a replacement
+- **Requested by** tags in Audiobookshelf show which user asked for a book
+- **Tasks:** every background job with its schedule, last run and a *run now* button; every automation has its own switch
 
 ### 🧰 Built for self-hosters
-- **One Docker image**, SQLite, no external database
-- **Setup wizard** on first start, every connection testable in the UI
-- **English and German** interface (per user, follows your browser)
+- **One Docker image**, SQLite, no external database; slim by default, with an optional `-whisper` variant
+- **Setup wizard** on first start, every connection editable and **testable in the UI**
+- **Multiple users and roles:** create accounts, or **sign in with your Audiobookshelf account** and import its users
+- **English and German** interface (per user, follows your browser), light and dark design, installable as an **app** (PWA)
 - **Extensions:** add your own sources as plugins without forking ([details](#-extensions))
 - Automation is **off by default** – nothing is downloaded or moved until you switch it on
 
@@ -77,13 +117,39 @@ Everything runs on your own server. ABW talks only to services you run yourself 
 
 ## 📸 Screenshots
 
-| Series detail | Release calendar |
-|---|---|
-| <img src="docs/screenshots/detail.png" alt="Series detail" width="440"> | <img src="docs/screenshots/calendar.png" alt="Calendar" width="440"> |
-| **Statistics** | **Tasks & automation** |
-| <img src="docs/screenshots/stats.png" alt="Statistics" width="440"> | <img src="docs/screenshots/tasks.png" alt="Tasks" width="440"> |
+All screenshots use a demo library with made-up users.
 
-<p align="center"><img src="docs/screenshots/mobile.png" alt="On the phone" width="260"><br><sub>On the phone</sub></p>
+### On the desktop
+
+| To Read | Series detail |
+|---|---|
+| <img src="docs/screenshots/toread.png" alt="To Read" width="440"> | <img src="docs/screenshots/detail.png" alt="Series detail" width="440"> |
+| **Recommend to other users** | **Who may recommend to whom (admin)** |
+| <img src="docs/screenshots/recommend.png" alt="Recommend" width="440"> | <img src="docs/screenshots/rec-rules.png" alt="Recommendation rules" width="440"> |
+| **Discover: for you** | **Discover: top lists** |
+| <img src="docs/screenshots/foryou.png" alt="For you" width="440"> | <img src="docs/screenshots/toplists.png" alt="Top lists" width="440"> |
+| **Rate what you heard** | **Top list per tag** |
+| <img src="docs/screenshots/rate.png" alt="Rate" width="440"> | <img src="docs/screenshots/tagtop.png" alt="Top list per tag" width="440"> |
+| **Authors** | **Notifications** |
+| <img src="docs/screenshots/authors.png" alt="Authors" width="440"> | <img src="docs/screenshots/notifications.png" alt="Notifications" width="440"> |
+| **Release calendar** | **Listening history** |
+| <img src="docs/screenshots/calendar.png" alt="Calendar" width="440"> | <img src="docs/screenshots/listening.png" alt="Listening history" width="440"> |
+| **Statistics** | **My ratings** |
+| <img src="docs/screenshots/stats.png" alt="Statistics" width="440"> | <img src="docs/screenshots/myratings.png" alt="My ratings" width="440"> |
+| **Tasks & automation** | **Setup wizard** |
+| <img src="docs/screenshots/tasks.png" alt="Tasks" width="440"> | <img src="docs/screenshots/wizard.png" alt="Setup wizard" width="440"> |
+
+### On the phone
+
+| Series | Series detail | To Read | For you |
+|---|---|---|---|
+| <img src="docs/screenshots/m-series.png" alt="Series on the phone" width="200"> | <img src="docs/screenshots/m-detail.png" alt="Series detail on the phone" width="200"> | <img src="docs/screenshots/m-toread.png" alt="To Read on the phone" width="200"> | <img src="docs/screenshots/m-foryou.png" alt="For you on the phone" width="200"> |
+| **Rate** | **Notifications** | **Listening history** | **Statistics** |
+| <img src="docs/screenshots/m-rate.png" alt="Rate on the phone" width="200"> | <img src="docs/screenshots/m-notifications.png" alt="Notifications on the phone" width="200"> | <img src="docs/screenshots/m-listening.png" alt="Listening history on the phone" width="200"> | <img src="docs/screenshots/m-stats.png" alt="Statistics on the phone" width="200"> |
+
+### Dark design
+
+<p align="center"><img src="docs/screenshots/dark-detail.png" alt="Series detail in the dark design" width="880"></p>
 
 ---
 
@@ -256,7 +322,8 @@ No. Without Prowlarr ABW is a very good overview of your series: what is complet
 <summary><b>Can my family use it?</b></summary>
 
 Yes. Create users in *Settings*, or import them from Audiobookshelf so they sign in with their existing password.
-Users can browse, rate, keep a To Read list and request books; reviewing and tasks stay with admins.
+Users can browse, rate, keep a To Read list, request books and recommend series to each other; reviewing and tasks stay with
+admins. Under *Settings → Recommend* an admin decides who may recommend to whom.
 </details>
 
 <details>
@@ -317,12 +384,22 @@ Prowlarr, lädt mit SABnzbd oder qBittorrent, **prüft jeden Download** (Laufzei
 die Bibliothek.
 
 **Das kann ABW**
-- Serienübersicht mit Cover und Status, deutsche und englische Fassung auf einer Karte, andere Sprecher und Hörspiele
-- Suche über Prowlarr, Download über SABnzbd und qBittorrent, Bewertung jedes Treffers mit Begründung
-- Ankunftsprüfung vor der Ablage, bessere Fassungen ersetzen schlechtere, Papierkorb statt Löschen
-- Mehrere Benutzer (auch mit dem Audiobookshelf-Konto), To-Read-Listen, Bewertungen, Empfehlungen, Kalender, Statistik
-- Push-Meldungen, als App installierbar, Oberfläche auf Deutsch und Englisch
-- Setup-Wizard, alle Verbindungen in der Oberfläche einstell- und prüfbar, Erweiterungen für eigene Quellen
+- **Hören:** To-Read-Liste je Benutzer mit nächstem Band, Fortschritt über die ganze Serie und voraussichtlichem Ende nach deinem
+  Hörtempo; füllt sich beim Hören selbst. Serien anderen Benutzern **weiterempfehlen** (wer wem empfehlen darf, legt der
+  Administrator fest), gehörte Bücher mit Sternen **bewerten**, als gehört markieren (wird nach Audiobookshelf übertragen)
+- **Bibliothek:** jede Serie mit allen Bänden laut Audible, deutsche und englische Fassung auf einer Karte, andere Sprecher und
+  Hörspiele, Einzelbücher je Autor, Filter nach Sprache, Status, Genre, Tag und Wunsch, Autorenübersicht
+- **Entdecken:** Vorschläge «Für dich» aus Gehörtem und Bewertungen, Serien deiner Autoren, Audible-Toplisten und freie Suche,
+  Goodreads-Regal als Wunschliste
+- **Neu:** Serien und Autoren markieren, Meldungen in der App, als Browser-Push oder über ntfy, Erscheinungskalender
+- **Rückblick:** Hörverlauf je Woche, Monat und Jahr (Konten, Geräte, Uhrzeiten, liegengebliebene Bücher), Statistik zum Bestand,
+  eigene Bewertungen und Topliste je Tag
+- **Werkstatt:** Suche über Prowlarr, Download über SABnzbd und qBittorrent, Bewertung jedes Treffers mit Begründung,
+  Ankunftsprüfung (Laufzeit, Tags, gesprochene Ansage), Sammelbände aufteilen, Ablage mit Audible-Match, bessere Fassungen
+  ersetzen schlechtere, Papierkorb statt Löschen, E-Books, MP3 zu M4B, Kapitel von Audible, nächtliche Prüfung auf Schäden
+- **Für Selbsthoster:** ein Docker-Image, SQLite, Setup-Wizard, alle Verbindungen in der Oberfläche einstell- und prüfbar,
+  Anmeldung auch mit dem Audiobookshelf-Konto, Oberfläche auf Deutsch und Englisch, hell und dunkel, als App installierbar,
+  Erweiterungen für eigene Quellen. Die Automatik ist nach der Einrichtung aus.
 
 **Schnellstart**
 

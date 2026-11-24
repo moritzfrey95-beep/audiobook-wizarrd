@@ -233,14 +233,44 @@ def _target(book_id: int) -> tuple[str, int]:
     return ("edition", b["edition_id"]) if b["edition_id"] else ("book", b["id"])
 
 
+REC_MODES = ("admins", "all", "custom", "off")
+
+
 def users(user_id: int) -> list[dict]:
-    """An wen man empfehlen kann: Administratoren an alle anderen Benutzer, Benutzer nur an die Administratoren
-    (Benutzer haben keine Auswahl, sie empfehlen nur ihm)."""
+    """An wen man empfehlen kann. Der Administrator legt das unter Einstellungen fest (rec_mode):
+    «admins» = Administratoren an alle, Benutzer nur an Administratoren; «all» = alle an alle;
+    «custom» = nach der Tabelle rec_allow; «off» = niemand."""
     c = db.conn()
+    mode = db.setting("rec_mode")
     me = c.execute("SELECT role FROM user WHERE id=?", (user_id,)).fetchone()
-    only_admins = bool(me) and me["role"] != "admin"
+    if mode == "off":
+        return []
+    if mode == "custom":
+        return [dict(r) for r in c.execute("SELECT u.id, u.name FROM rec_allow a JOIN user u ON u.id=a.to_user"
+                                           " WHERE a.from_user=? AND u.id<>? ORDER BY u.name COLLATE NOCASE", (user_id, user_id))]
+    only_admins = mode == "admins" and bool(me) and me["role"] != "admin"
     return [dict(r) for r in c.execute("SELECT id, name FROM user WHERE id<>?" + (" AND role='admin'" if only_admins else "")
                                        + " ORDER BY name COLLATE NOCASE", (user_id,))]
+
+
+def rules() -> dict:
+    """Einstellung fürs Weiterempfehlen (nur Administrator): Modus und erlaubte Paare für «custom»."""
+    c = db.conn()
+    return {"mode": db.setting("rec_mode"),
+            "users": [dict(r) for r in c.execute("SELECT id, name, role FROM user ORDER BY name COLLATE NOCASE")],
+            "allow": [[r[0], r[1]] for r in c.execute("SELECT from_user, to_user FROM rec_allow ORDER BY 1, 2")]}
+
+
+def set_rules(mode: str, allow: list[list[int]] | None = None) -> None:
+    if mode not in REC_MODES:
+        raise ValueError("Unbekannte Einstellung fürs Weiterempfehlen")
+    c = db.conn()
+    db.set_setting("rec_mode", mode)
+    if allow is not None:
+        ids = {r[0] for r in c.execute("SELECT id FROM user")}
+        c.execute("DELETE FROM rec_allow")
+        c.executemany("INSERT OR IGNORE INTO rec_allow VALUES(?,?)",
+                      [(a, b) for a, b in allow if a != b and a in ids and b in ids])
 
 
 def heard(user_id: int) -> list[dict]:

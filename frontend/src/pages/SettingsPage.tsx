@@ -64,7 +64,7 @@ function AuthPanel({ me, onChange }: { me: MeInfo; onChange: () => void }) {
     <form onSubmit={save} className={box}>
       <p className="mb-4 text-sm text-muted">
         {on
-          ? t('Du bist als «{{v0}}» angemeldet ({{v1}}). Ein Gerät bleibt {{v2}} Tage angemeldet.', { v0: me.user, v1: admin ? 'Administrator' : 'Benutzer', v2: me.session_days })
+          ? t('Du bist als «{{v0}}» angemeldet ({{v1}}). Ein Gerät bleibt {{v2}} Tage angemeldet.', { v0: me.user, v1: admin ? t('Administrator') : t('Benutzer'), v2: me.session_days })
             + (me.abs_name ? t(' Verknüpft mit dem Konto «{{v0}}» in Audiobookshelf: Dessen Benutzername und Passwort gelten hier ebenfalls, das Passwort unten zusätzlich.', { v0: me.abs_name }) : '')
           : t('Die Anmeldung ist ausgeschaltet: Jeder im Heimnetz und über Tailscale kann ABW öffnen. Lege ein Passwort fest, bevor du ABW von aussen erreichbar machst; damit wirst du Administrator und kannst weitere Benutzer anlegen.')}
       </p>
@@ -168,6 +168,81 @@ function AbsPanel({ users, onChange }: { users: User[]; onChange: () => void }) 
   )
 }
 
+type RecMode = 'admins' | 'all' | 'custom' | 'off'
+interface RecRules { mode: RecMode; users: { id: number; name: string; role: 'admin' | 'user' }[]; allow: [number, number][] }
+
+/** Wer wem empfehlen darf (nur Administrator): eine Grundregel oder eine eigene Tabelle «von → an». */
+function RecRulesPanel() {
+  const { data, error, reload } = useData<RecRules>('/recommend/rules')
+  const [mode, setMode] = useState<RecMode | null>(null)
+  const [allow, setAllow] = useState<Set<string> | null>(null)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  if (error && !data) return <ErrorBox message={error} onRetry={reload} />
+  if (!data) return <div className="skeleton h-32 rounded-xl" />
+  const m = mode ?? data.mode
+  const pairs = allow ?? new Set(data.allow.map(([a, b]) => `${a}:${b}`))
+  const modes: { key: RecMode; label: string; hint: string }[] = [
+    { key: 'admins', label: t('Nur an Administratoren'), hint: t('Administratoren empfehlen allen, Benutzer nur den Administratoren.') },
+    { key: 'all', label: t('Alle an alle'), hint: t('Jeder kann jedem anderen Benutzer empfehlen.') },
+    { key: 'custom', label: t('Eigene Auswahl'), hint: t('Du legst für jeden Benutzer fest, wem er empfehlen darf.') },
+    { key: 'off', label: t('Aus'), hint: t('Niemand kann empfehlen.') },
+  ]
+  const toggle = (a: number, b: number) => {
+    const k = `${a}:${b}`, n = new Set(pairs)
+    if (n.has(k)) n.delete(k); else n.add(k)
+    setAllow(n)
+  }
+  const save = async () => {
+    setBusy(true); setMsg(null)
+    try {
+      await api('/recommend/rules', { method: 'PUT', body: JSON.stringify({ mode: m, allow: [...pairs].map(k => k.split(':').map(Number)) }) })
+      setMode(null); setAllow(null); reload(); setMsg({ ok: true, text: t('Gespeichert.') })
+    } catch (e) { setMsg({ ok: false, text: (e as Error).message }) } finally { setBusy(false) }
+  }
+  return (
+    <div className={box}>
+      <fieldset>
+        <legend className="mb-2 text-sm text-muted">{t('Empfohlene Serien erscheinen beim Empfänger unter «To Read», er entscheidet selbst, ob sie auf seine Liste kommen.')}</legend>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          {modes.map(x => (
+            <label key={x.key} className={`flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border p-3 ${m === x.key ? 'border-accent bg-surface-2' : 'border-line'}`}>
+              <input type="radio" name="rec-mode" value={x.key} checked={m === x.key} onChange={() => setMode(x.key)} className="mt-1 h-4 w-4 accent-[var(--accent)]" />
+              <span><span className="block text-sm font-semibold">{x.label}</span><span className="block text-xs text-muted">{x.hint}</span></span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      {m === 'custom' && (
+        <div className="mt-4 overflow-x-auto">
+          <table className="text-sm">
+            <caption className="mb-2 text-left text-xs text-muted">{t('Zeile = wer empfiehlt, Spalte = wer die Empfehlung bekommt')}</caption>
+            <thead><tr><th className="p-2 text-left font-normal text-muted">{t('von ↓ / an →')}</th>{data.users.map(u => <th key={u.id} scope="col" className="p-2 font-semibold">{u.name}</th>)}</tr></thead>
+            <tbody>
+              {data.users.map(a => (
+                <tr key={a.id} className="border-t border-line">
+                  <th scope="row" className="p-2 text-left font-semibold">{a.name}</th>
+                  {data.users.map(b => (
+                    <td key={b.id} className="p-2 text-center">
+                      {a.id === b.id ? <span className="text-faint">–</span>
+                        : <input type="checkbox" aria-label={t('{{v0}} darf {{v1}} empfehlen', { v0: a.name, v1: b.name })} checked={pairs.has(`${a.id}:${b.id}`)}
+                            onChange={() => toggle(a.id, b.id)} className="h-4 w-4 accent-[var(--accent)]" />}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Button variant="primary" onClick={save} disabled={busy || (mode === null && allow === null)}><Save size={15} aria-hidden />{t('Speichern')}</Button>
+        {msg && <span role="status" className={`text-sm ${msg.ok ? '' : 'text-bad'}`} style={msg.ok ? { color: 'var(--ok)' } : undefined}>{msg.text}</span>}
+      </div>
+    </div>
+  )
+}
+
 /** Benutzerverwaltung (nur Administrator): Zugänge anlegen, Passwort neu setzen, Rolle ändern, löschen. */
 function UsersPanel({ users, meId, minLength, onChange }: { users: User[]; meId: number; minLength: number; onChange: () => void }) {
   const [name, setName] = useState('')
@@ -191,7 +266,7 @@ function UsersPanel({ users, meId, minLength, onChange }: { users: User[]; meId:
   const flip = async (u: User) => {
     const to = u.role === 'admin' ? 'user' : 'admin'
     if (!await ask(to === 'admin' ? t('«{{v0}}» zum Administrator machen? Er darf dann alles, auch Prüfen, Aufgaben und Benutzer verwalten.', { v0: u.name }) : t('«{{v0}}» zum Benutzer machen? Er sieht dann «Prüfen» und «Aufgaben» nicht mehr.', { v0: u.name }), t('Rolle ändern'))) return
-    run(() => api(`/users/${u.id}`, { method: 'POST', body: JSON.stringify({ role: to }) }), t('«{{v0}}» ist jetzt {{v1}}.', { v0: u.name, v1: to === 'admin' ? 'Administrator' : 'Benutzer' }))
+    run(() => api(`/users/${u.id}`, { method: 'POST', body: JSON.stringify({ role: to }) }), t('«{{v0}}» ist jetzt {{v1}}.', { v0: u.name, v1: to === 'admin' ? t('Administrator') : t('Benutzer') }))
   }
   const remove = async (u: User) => {
     if (!await ask(t('Benutzer «{{v0}}» löschen? Seine Markierungen und Benachrichtigungen gehen verloren. Was er hinzugefügt hat, bleibt in der Bibliothek.', { v0: u.name }), t('Löschen'))) return
@@ -342,6 +417,11 @@ export default function SettingsPage() {
       {admin && m.auth_enabled && data && (
         <Section title={t('Benutzer')} hint={`${data.users.length} ${data.users.length === 1 ? t('Zugang') : t('Zugänge')}`}>
           <UsersPanel users={data.users} meId={m.id} minLength={m.min_length} onChange={reload} />
+        </Section>
+      )}
+      {admin && m.auth_enabled && data && data.users.length > 1 && (
+        <Section title={t('Weiterempfehlen')} hint={t('Wer wem Serien empfehlen darf')}>
+          <RecRulesPanel />
         </Section>
       )}
       {admin && m.auth_enabled && data && (
