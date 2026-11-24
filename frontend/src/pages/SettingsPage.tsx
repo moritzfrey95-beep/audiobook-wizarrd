@@ -391,7 +391,7 @@ function ConnectionsSection({ onChange }: { onChange: () => void }) {
             <button type="button" onClick={() => setOpen(open === g.key ? null : g.key)} aria-expanded={open === g.key}
               className="flex min-h-11 w-full items-center justify-between rounded-xl border border-line bg-surface px-4 text-left text-sm font-semibold hover:bg-surface-2">
               <span>{g.title}</span>
-              <span className="text-xs font-normal text-muted">{filled(g) ? t('eingerichtet') : g.optional ? t('optional, nicht eingerichtet') : t('nicht eingerichtet')}</span>
+              <span className="text-xs font-normal text-muted">{g.key === 'folders' ? (filled(g) ? t('angepasst') : t('Grundschema')) : filled(g) ? t('eingerichtet') : g.optional ? t('optional, nicht eingerichtet') : t('nicht eingerichtet')}</span>
             </button>
             {open === g.key && <div className="mt-2"><GroupForm group={g} cfg={c} onSaved={() => { cfg.reload(); onChange() }} /></div>}
           </div>

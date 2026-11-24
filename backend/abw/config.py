@@ -17,7 +17,7 @@ AUDIBLE_LANG = {"en": "english", "de": "german"}
 @dataclass(frozen=True)
 class Field:
     env: str                # Umgebungsvariable mit dem Grundwert
-    kind: str = "str"       # str, url, ids, path, bool, float, secret
+    kind: str = "str"       # str, url, ids, path, bool, float, secret, scheme
     default: str = ""
     group: str = ""         # Abschnitt in den Einstellungen
 
@@ -32,6 +32,9 @@ FIELDS: dict[str, Field] = {
     "LIBRARY_DE_ROOT": Field("LIBRARY_DE_ROOT", "path", "/library-de", "abs"),
     "LIBRARY_TRASH": Field("LIBRARY_TRASH", "path", "/library-trash", "abs"),
     "IMPORT_ENABLED": Field("ABW_IMPORT_ENABLED", "bool", "0", "abs"),
+    # Ordnerstruktur beim Ablegen (siehe folders.py)
+    "FOLDER_SERIES": Field("ABW_FOLDER_SERIES", "scheme", "{series}/<Book {seq} - >{title}", "folders"),
+    "FOLDER_SINGLE": Field("ABW_FOLDER_SINGLE", "scheme", "Standalone - {author}/{title}", "folders"),
     "PROWLARR_URL": Field("PROWLARR_URL", "url", "", "prowlarr"),
     "PROWLARR_API_KEY": Field("PROWLARR_API_KEY", "secret", "", "prowlarr"),
     "USENET_INDEXER_IDS": Field("USENET_INDEXER_IDS", "ids", "", "prowlarr"),
@@ -95,6 +98,9 @@ def _typed(name: str, text: str):
         return Path(text) if text.strip() else None
     if kind == "bool":
         return text.strip().lower() in ("1", "true", "ja", "yes", "on")
+    if kind == "scheme":  # ungültiges Schema (etwa von Hand in .env): Grundschema, damit die Ablage nicht scheitert
+        from . import folders
+        return text.strip() if not folders.problem(text, single=name == "FOLDER_SINGLE") else FIELDS[name].default
     if kind == "float":
         try:
             return float(text)

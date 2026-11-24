@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from . import __version__
 from . import abs as abs_mod
-from . import activity, audible, auth, chapters, cleanup, config, convert, db, ebook, foryou, i18n, importer, integrity, libsplit, library, librarytags, listened, listening, notifications, notify, plugins, push, ratings, search, setup, tasks, titles, toread, torrent, usenet, variants, verify, wishlist
+from . import activity, audible, auth, chapters, cleanup, config, convert, db, ebook, folders, foryou, i18n, importer, integrity, libsplit, library, librarytags, listened, listening, notifications, notify, plugins, push, ratings, search, setup, tasks, titles, toread, torrent, usenet, variants, verify, wishlist
 
 app = FastAPI(title="AudioBook Wizarrd", version=__version__)
 PRIORITY = ["downloading", "review", "failed", "searching", "incomplete", "upcoming", "complete", "unknown", "single", "absent", "unmonitored"]
@@ -917,9 +917,23 @@ def config_put(body: ConfigSave):
                 raise HTTPException(400, f"{name}: nur Zahlen mit Komma getrennt")
             if f.kind == "path" and value and not value.startswith("/"):
                 raise HTTPException(400, f"{name}: Pfad muss mit / beginnen")
+            if f.kind == "scheme" and (err := folders.problem(value, single=name == "FOLDER_SINGLE")):
+                raise HTTPException(400, i18n.tr(err))
         vals[name] = value
     config.save(db.conn(), vals)
     return _config_view()
+
+
+class FolderPreview(BaseModel):
+    series: str
+    single: str
+
+
+@app.post("/api/config/folders")
+def config_folders(body: FolderPreview):
+    """Beispiele zum Ordnerschema, ohne zu speichern; dazu die Vorlagen."""
+    r = folders.preview(body.series, body.single)
+    return {**r, "text": i18n.tr(r["text"]), "presets": {k: {"series": a, "single": b} for k, (a, b) in folders.PRESETS.items()}}
 
 
 class ConfigTest(BaseModel):

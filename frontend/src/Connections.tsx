@@ -3,6 +3,7 @@ import { CheckCircle2, CircleAlert, Loader2, PlugZap, Save } from 'lucide-react'
 import { api } from './api'
 import { Button } from './ui'
 import { t } from './i18n'
+import { FolderForm } from './Folders'
 
 export interface CfgField { name: string; kind: string; group: string; source: 'db' | 'env' | 'default'; value: string; set?: boolean }
 export interface CfgView { fields: Record<string, CfgField>; langs: ('en' | 'de')[]; speech: boolean; plugins: string[] }
@@ -27,6 +28,10 @@ export const GROUPS: Group[] = [
       { name: 'LIBRARY_TRASH', label: t('Papierkorb'), hint: t('Auf derselben Platte wie die Bibliotheken') },
       { name: 'IMPORT_ENABLED', label: t('ABW darf Bücher in die Bibliothek legen'), type: 'checkbox' },
     ],
+  },
+  {
+    key: 'folders', title: t('Ordnerstruktur'), text: '',
+    fields: [{ name: 'FOLDER_SERIES', label: t('Bände einer Serie') }, { name: 'FOLDER_SINGLE', label: t('Einzelbücher') }],
   },
   {
     key: 'prowlarr', title: t('Prowlarr'), test: 'prowlarr', optional: true, text: t('Suche nach Hörbüchern und E-Books. Usenet-Indexer laden über SABnzbd, Torrent-Indexer über qBittorrent.'),
@@ -79,8 +84,15 @@ export const GROUPS: Group[] = [
 const input = 'h-10 w-full rounded-lg border border-line bg-bg px-3 text-sm'
 const PATHS = new Set(['LIBRARY_EN_ROOT', 'LIBRARY_DE_ROOT', 'LIBRARY_TRASH', 'USENET_COMPLETE_ROOT', 'TORRENT_COMPLETE_ROOT'])
 
-/** Ein Abschnitt Verbindungen: Felder, Test, Speichern. onSaved bekommt den neuen Stand. */
-export function GroupForm({ group, cfg, onSaved, saveLabel = t('Speichern') }: { group: Group; cfg: CfgView; onSaved: (c: CfgView) => void; saveLabel?: string }) {
+type FormProps = { group: Group; cfg: CfgView; onSaved: (c: CfgView) => void; saveLabel?: string }
+
+/** Ein Abschnitt Verbindungen; die Ordnerstruktur hat ein eigenes Formular. */
+export function GroupForm(props: FormProps) {
+  return props.group.key === 'folders' ? <FolderForm cfg={props.cfg} onSaved={props.onSaved} saveLabel={props.saveLabel} /> : <ServiceForm {...props} />
+}
+
+/** Felder, Test, Speichern. onSaved bekommt den neuen Stand. */
+function ServiceForm({ group, cfg, onSaved, saveLabel = t('Speichern') }: FormProps) {
   const start = Object.fromEntries(group.fields.map(f => [f.name, cfg.fields[f.name]?.value ?? '']))
   const [vals, setVals] = useState<Record<string, string>>(start)
   const [busy, setBusy] = useState<string | null>(null)

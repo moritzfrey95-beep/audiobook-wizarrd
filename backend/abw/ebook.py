@@ -285,7 +285,7 @@ def folder_of(book: dict) -> Path:
     if book["owned"]:
         return config.LIBRARY_ROOT[book["lang"]] / book["rel_path"]
     # künftiger Buchordner: dorthin legt die Ablage später auch das Hörbuch
-    return config.LIBRARY_ROOT[book["lang"]] / (book.get("pre_path") or "/".join(importer.target_rel(book)))
+    return config.LIBRARY_ROOT[book["lang"]] / (book.get("pre_path") or Path(*importer.target_rel(book)))
 
 
 def blocker(book: dict) -> str | None:

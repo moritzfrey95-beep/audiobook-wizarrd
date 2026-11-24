@@ -7,7 +7,7 @@ A self-hosted companion for [Audiobookshelf](https://www.audiobookshelf.org/) �
 
 [![CI](https://github.com/moritzfrey95-beep/audiobook-wizarrd/actions/workflows/ci.yml/badge.svg)](https://github.com/moritzfrey95-beep/audiobook-wizarrd/actions/workflows/ci.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.6.1-8b74ff)
+![Version](https://img.shields.io/badge/version-0.6.2-8b74ff)
 ![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)
 ![Languages](https://img.shields.io/badge/UI-English%20%7C%20Deutsch-555)
 
@@ -92,7 +92,8 @@ ABW is organised like your day with audiobooks: **Listen**, **Library**, **Disco
 - **Arrival check** before anything touches your library: files, runtime vs. Audible (with a diagnosis: omnibus, other recording,
   incomplete), tags, and optionally **speech recognition** of the spoken intro (faster-whisper)
 - **Omnibus downloads are split** into one folder per volume, by volume number or by Audible runtimes
-- **Import** into the right folder (`Series/Book X - Title`), next to the volumes you already have; Audiobookshelf is told to rescan
+- **Import** into the right folder, next to the volumes you already have; Audiobookshelf is told to rescan
+- **Your folder structure**: `Series/Book X - Title`, `Author/Series/Book X - Title` or your own scheme with placeholders, with a live preview
   and the book is matched with Audible by ASIN
 - **Better editions replace worse ones** automatically; old files go to a **trash folder**, nothing is deleted without a button press
 - **Review** page for everything that needs a decision: import anyway, discard, check again, pick a result, link language editions,
@@ -172,9 +173,10 @@ Open **`http://<your-server>:8790`** and follow the setup wizard:
 
 1. **Account** – create an admin (or skip: then ABW is only reachable from your home network)
 2. **Audiobookshelf** – address, API key, pick your English and/or German library *(required)*
-3. **Prowlarr** – test the connection, tick the indexers ABW may use
-4. **SABnzbd / qBittorrent** – download clients and their finished-download folders
-5. **Notifications** and **extras** – all optional
+3. **Folder structure** – how new books are filed (see below)
+4. **Prowlarr** – test the connection, tick the indexers ABW may use
+5. **SABnzbd / qBittorrent** – download clients and their finished-download folders
+6. **Notifications** and **extras** – all optional
 
 After the wizard ABW reads your library and asks Audible about every series. The first run takes a few minutes for a large
 library. **All automation stays off** until you enable it under *Workshop → Tasks*.
@@ -308,6 +310,16 @@ disk; nothing is deleted without you pressing a button. Without import, ABW is r
 </details>
 
 <details>
+<summary><b>Can I use my own folder structure, e.g. <code>Author/Series/Book 1 - Title</code>?</b></summary>
+
+Yes, in the wizard or under *Settings → Connections → Folder structure*. Pick a template or write your own scheme with
+`{author}`, `{series}`, `{seq}`, `{title}`, `{narrator}` and `{year}`; `/` separates folders. Text in `< >` is dropped when a
+value inside is missing, so `{author}/{series}/<Book {seq} - >{title}` files a book without a number simply as its title.
+A folder per volume works too: `{author}/{series}/<Book {seq}/>{title}`. If a series already has volumes in your library,
+new ones go next to them, whatever the scheme says. ABW never moves existing folders.
+</details>
+
+<details>
 <summary><b>Which languages and Audible regions are supported?</b></summary>
 
 English (audible.com) and German (audible.de) libraries – one Audiobookshelf library per language, each optional.
@@ -398,7 +410,8 @@ die Bibliothek.
   eigene Bewertungen und Topliste je Tag
 - **Werkstatt:** Suche über Prowlarr, Download über SABnzbd und qBittorrent, Bewertung jedes Treffers mit Begründung,
   Ankunftsprüfung (Laufzeit, Tags, gesprochene Ansage), Sammelbände aufteilen, Ablage mit Audible-Match, bessere Fassungen
-  ersetzen schlechtere, Papierkorb statt Löschen, E-Books, MP3 zu M4B, Kapitel von Audible, nächtliche Prüfung auf Schäden
+  ersetzen schlechtere, Papierkorb statt Löschen, E-Books, MP3 zu M4B, Kapitel von Audible, nächtliche Prüfung auf Schäden,
+  eigene Ordnerstruktur (etwa `Autor/Serie/Book 1 - Titel`) mit Vorschau
 - **Für Selbsthoster:** ein Docker-Image, SQLite, Setup-Wizard, alle Verbindungen in der Oberfläche einstell- und prüfbar,
   Anmeldung auch mit dem Audiobookshelf-Konto, Oberfläche auf Deutsch und Englisch, hell und dunkel, als App installierbar,
   Erweiterungen für eigene Quellen. Die Automatik ist nach der Einrichtung aus.

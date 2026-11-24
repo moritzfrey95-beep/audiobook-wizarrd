@@ -6,7 +6,7 @@ COPY frontend/ ./
 RUN npx vite build
 
 FROM python:3.13-slim
-LABEL org.opencontainers.image.title="AudioBook Wizarrd" org.opencontainers.image.version="0.6.1"
+LABEL org.opencontainers.image.title="AudioBook Wizarrd" org.opencontainers.image.version="0.6.2"
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 COPY backend/requirements.txt backend/requirements-whisper.txt ./

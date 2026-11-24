@@ -10,7 +10,7 @@ from datetime import datetime
 from collections import Counter
 from pathlib import Path
 
-from . import config, db, plugins, verify
+from . import config, db, folders, plugins, verify
 
 KEEP = verify.AUDIO | {".jpg", ".jpeg", ".png", ".cue", ".nfo", ".opf", ".pdf"}
 
@@ -85,32 +85,54 @@ def source_dir(download: dict) -> Path:
 
 
 def target_rel(book: dict) -> tuple[str, str]:
-    """Serienordner und Buchordner, in dem ein Band landet (relativ zur Bibliothek)."""
+    """Ordner und Buchordner, in dem ein Band landet (relativ zur Bibliothek), nach dem eingestellten Schema.
+    Liegen von der Serie (bei Einzelbüchern: vom Autor) schon Bücher in einem gemeinsamen Ordner, kommt das neue dazu."""
     c = db.conn()
-    seq = (book.get("sequence") or "").strip()
+    from . import abs as abs_mod
+    author = abs_mod.primary_author(book.get("author"))
+    vals = {"author": author, "series": book.get("series") or "", "seq": (book.get("sequence") or "").strip(),
+            "title": book.get("title") or "", "narrator": (book.get("narrator") or "").split(",")[0].strip(),
+            "year": (book.get("release_date") or "")[:4]}
     if book.get("edition_id"):
+        vals["series"] = vals["series"] or book["title"]
+        head, tail = folders.split(config.FOLDER_SERIES, vals)
         siblings = [r["rel_path"] for r in c.execute(
             "SELECT rel_path FROM book WHERE edition_id=? AND owned=1 AND rel_path IS NOT NULL", (book["edition_id"],))]
-        parents = Counter(str(Path(p).parent) for p in siblings if "/" in p)
-        series_dir = parents.most_common(1)[0][0] if parents else clean(book.get("series") or book["title"])
-        name = f"Book {seq} - {book['title']}" if seq else book["title"]
+        roots = Counter(_group_root(p, config.FOLDER_SERIES) for p in siblings if "/" in p)
+        series_dir = str(Path(roots.most_common(1)[0][0] if roots else "/".join(head), *tail[:-1]))
+        name = tail[-1]
         # Mehrere Sprecher-Fassungen derselben Sprache: Sprecher im Ordnernamen, sonst stossen sie zusammen oder sind
         # nicht auseinanderzuhalten. Die ungebundene Hauptfassung nimmt den Sprecher des Buchs laut Audible
         # (Harry Potter DE: Manteuffel neben «Gesprochen von Rufus Beck», 18.11.2026).
         from . import variants
         e = c.execute("SELECT series_id, lang, narr FROM edition WHERE id=?", (book["edition_id"],)).fetchone()
         narr = e and (e["narr"] or next(iter(variants.expected_narrators({k: book.get(k) for k in ("title", "narrator")})), None))
-        if narr and c.execute("SELECT 1 FROM edition WHERE series_id=? AND lang=? AND id<>? AND narr IS NOT NULL",
-                              (e["series_id"], e["lang"], book["edition_id"])).fetchone():
-            name += f" [{narr}]"
-        return series_dir, clean(name)
-    # Einzelbuch: wie die vorhandenen Einzelbücher unter «Standalone - Autor»
-    from . import abs as abs_mod
-    author = abs_mod.primary_author(book.get("author"))
+        if narr and "{narrator}" not in config.FOLDER_SERIES and c.execute(
+                "SELECT 1 FROM edition WHERE series_id=? AND lang=? AND id<>? AND narr IS NOT NULL",
+                (e["series_id"], e["lang"], book["edition_id"])).fetchone():
+            name = folders.clean(f"{name} [{narr}]")
+        return series_dir, name
+    head, tail = folders.split(config.FOLDER_SINGLE, vals)
     same = [r["rel_path"] for r in c.execute("SELECT rel_path, author FROM book WHERE edition_id IS NULL AND owned=1 AND lang=? AND rel_path LIKE '%/%'", (book["lang"],))
             if db.norm(abs_mod.primary_author(r["author"])) == db.norm(author)]
-    parents = Counter(str(Path(p).parent) for p in same)
-    return (parents.most_common(1)[0][0] if parents else clean(f"Standalone - {author}")), clean(book["title"])
+    roots = Counter(_group_root(p, config.FOLDER_SINGLE) for p in same)
+    return str(Path(roots.most_common(1)[0][0] if roots else "/".join(head), *tail[:-1])), tail[-1]
+
+
+def _group_root(rel: str, scheme: str) -> str:
+    """Ordner der Serie (oder des Autors) eines vorhandenen Buchs: sein Elternordner, bei einem Schema mit eigenem
+    Ordner je Band («Book 2/Titel») der Ordner darüber."""
+    p = Path(rel).parent
+    vol = folders.volume_dir(scheme)
+    while vol and len(p.parts) > 1 and vol.match(p.name):
+        p = p.parent
+    return str(p)
+
+
+def same_volume(folder_name: str, seq: str) -> bool:
+    """Ist dieser Buchordner derselbe Band? Nach dem eingestellten Schema und nach «Book N» (ABW-Grundschema)."""
+    pats = [re.compile(rf"^Book 0*{re.escape(seq)}(?![\d.])"), folders.volume_prefix(config.FOLDER_SERIES, seq)]
+    return any(p and p.match(folder_name) for p in pats)
 
 
 def plan(book: dict, download: dict) -> dict:
@@ -152,7 +174,8 @@ def plan(book: dict, download: dict) -> dict:
         if not target.is_dir():
             hard.append("Am Ziel liegt eine Datei statt eines Ordners")
     # «Book 2.5» ist ein anderer Band als «Book 2»
-    same = [p for p in siblings if seq and re.match(rf"^Book 0*{re.escape(seq)}(?![\d.])", Path(p).name) and root / p != target]
+    depth = len(folders.split(config.FOLDER_SERIES, {k: "x" for k in folders.KEYS})[1])  # Ordnerebenen je Band
+    same = [p for p in siblings if seq and any(same_volume(x, seq) for x in Path(p).parts[1:][-depth:]) and root / p != target]
     # Mehrteiliger Band: ein anderer Teil derselben Nummer ist kein Hindernis, ein ganzer Band schon
     from . import variants
     if (part := variants.part_of(book.get("title"))) is not None:
@@ -160,7 +183,7 @@ def plan(book: dict, download: dict) -> dict:
     if same:
         problems.append(f"Für Band {seq} gibt es schon einen Ordner: {same[0]}")
         hard.append(problems[-1])
-    return {"target": str(target), "shown": f"{series_dir}/{name}", "existing": existing, "merge": merge,
+    return {"target": str(target), "shown": str(Path(series_dir) / name), "existing": existing, "merge": merge,
             # Von Hand überschreiben: nur wenn allein der vorhandene Zielordner im Weg steht
             "overwritable": bool(existing) and not hard,
             "new_series_folder": not (root / series_dir).exists(), "files": [str(p.relative_to(src)) for p in files],
