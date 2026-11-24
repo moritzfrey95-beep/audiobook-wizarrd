@@ -42,7 +42,7 @@ const CHILD_BAD = new Set(['rejected', 'failed'])
 /** «Aufgeteilt in 7: 5 passen, 2 weichen ab» aus den Zuständen der entstandenen Einzelbände. */
 function splitSummary(ch: NonNullable<Dl['children']>): string {
   const ok = ch.filter(k => CHILD_OK.has(k.state)).length, bad = ch.filter(k => CHILD_BAD.has(k.state)).length, open = ch.length - ok - bad
-  return t('Aufgeteilt in {{v0}}: {{v1}} passen{{v2}}{{v3}}', { v0: ch.length, v1: ok, v2: bad ? `, ${bad} weichen ab` : '', v3: open ? `, ${open} noch in Prüfung` : '' })
+  return t('Aufgeteilt in {{v0}}: {{v1}} passen{{v2}}{{v3}}', { v0: ch.length, v1: ok, v2: bad ? t(', {{n}} weichen ab', { n: bad }) : '', v3: open ? t(', {{n}} noch in Prüfung', { n: open }) : '' })
 }
 const KIND = {
   ready: { label: t('Bereit zum Ablegen'), color: 'var(--ok)', icon: CheckCircle2 },
@@ -125,13 +125,13 @@ function DecideCard({ d, onChange }: { d: Dl; onChange: () => void }) {
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {d.replaces ? (
             <Button variant="primary" disabled={blocked || busy !== null}
-              onClick={() => act('replace', `«${d.book_title}» im Bestand ersetzen? Das bisherige Buch wandert in den Papierkorb, der neue Band kommt an dieselbe Stelle.`, 'Bestand ersetzen')}
+              onClick={() => act('replace', t('«{{title}}» im Bestand ersetzen? Das bisherige Buch wandert in den Papierkorb, der neue Band kommt an dieselbe Stelle.', { title: d.book_title }), t('Bestand ersetzen'))}
               title={filing ? t('Wird gerade abgelegt') : blocked ? (d.plan?.problems[0] ?? t('Die Ablage ist ausgeschaltet')) : t('Das bisherige Buch geht in den Papierkorb, nichts wird gelöscht')}>
               {busy === 'replace' ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <FolderInput size={15} aria-hidden />}{t('Bestand ersetzen')}
             </Button>
           ) : overwrite ? (
             <Button disabled={filing || busy !== null} title={t('Der vorhandene Ordner geht in den Papierkorb, nichts wird gelöscht')}
-              onClick={() => act('overwrite', `Den vorhandenen Ordner «${d.plan!.shown}» überschreiben?\n\nIm Ordner liegen jetzt ${d.plan!.existing!.files} Dateien (${mb(d.plan!.existing!.bytes)}). Sie wandern in den Papierkorb der Bibliothek, gelöscht wird nichts. An ihre Stelle kommt der neue Download mit ${d.plan!.files.length} Dateien (${mb(d.plan!.bytes)}).`, 'Überschreiben')}>
+              onClick={() => act('overwrite', t('Den vorhandenen Ordner «{{folder}}» überschreiben?\n\nIm Ordner liegen jetzt {{n}} Dateien ({{size}}). Sie wandern in den Papierkorb der Bibliothek, gelöscht wird nichts. An ihre Stelle kommt der neue Download mit {{m}} Dateien ({{size2}}).', { folder: d.plan!.shown, n: d.plan!.existing!.files, size: mb(d.plan!.existing!.bytes), m: d.plan!.files.length, size2: mb(d.plan!.bytes) }), t('Überschreiben'))}>
               {busy === 'overwrite' ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <FolderInput size={15} aria-hidden />}{t('Überschreiben')}
             </Button>
           ) : <Button variant={d.kind === 'ready' ? 'primary' : 'ghost'} disabled={blocked || busy !== null} onClick={() => act('import')}
@@ -139,7 +139,7 @@ function DecideCard({ d, onChange }: { d: Dl; onChange: () => void }) {
             {busy === 'import' ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <FolderInput size={15} aria-hidden />}
             {d.kind === 'ready' ? t('In Bibliothek ablegen') : t('Trotzdem ablegen')}
           </Button>}
-          <Button disabled={filing || busy !== null} onClick={() => act('reject', `«${d.book_title}» verwerfen? Der Download wird nicht abgelegt und dieser Treffer nicht mehr angeboten.`, 'Verwerfen')}>
+          <Button disabled={filing || busy !== null} onClick={() => act('reject', t('«{{title}}» verwerfen? Der Download wird nicht abgelegt und dieser Treffer nicht mehr angeboten.', { title: d.book_title }), t('Verwerfen'))}>
             <Trash2 size={15} aria-hidden />{t('Verwerfen')}
           </Button>
           <Button disabled={filing || busy !== null} onClick={() => act('recheck')}><RotateCcw size={15} aria-hidden />{t('Neu prüfen')}</Button>

@@ -204,7 +204,7 @@ function ListTab() {
       {err && <ErrorBox message={err} plain />}
       {!d.next.length && !d.waiting.length && !d.recommended.length && !d.suggested.length && <Empty title={t('Noch nichts geplant')} text={t('Setze in einer Serie «Zu To Read». Hörst du einen Band fertig und folgt ein weiterer, kommt die Serie von selbst auf die Liste.')} />}
       {d.next.length > 0 && (
-        <Block title={t('Als Nächstes')} hint={t('{{v0}} auf der Liste · nächste Bände rund {{v1}} h{{v2}}', { v0: d.next.length, v1: d.hours, v2: d.pace_h ? ` · dein Tempo: ${d.pace_h.toLocaleString(locale())} h pro Tag (letzte 30 Tage)` : '' })}>
+        <Block title={t('Als Nächstes')} hint={t('{{v0}} auf der Liste · nächste Bände rund {{v1}} h{{v2}}', { v0: d.next.length, v1: d.hours, v2: d.pace_h ? t(' · dein Tempo: {{h}} h pro Tag (letzte 30 Tage)', { h: d.pace_h.toLocaleString(locale()) }) : '' })}>
           {pinned.map(x => <Row key={x.key} x={x} absUrl={d.abs_url} onRemove={() => remove(x.key)} />)}
           {sorted.map((x, i) => (
             <Row key={x.key} x={x} absUrl={d.abs_url} onRemove={() => remove(x.key)}

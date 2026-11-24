@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from collections import Counter, defaultdict
@@ -410,6 +411,25 @@ async def translated_error(request: Request, exc: StarletteHTTPException):
     """Fehlermeldungen in der Sprache der Oberfläche."""
     detail = i18n.tr(exc.detail) if isinstance(exc.detail, str) else exc.detail
     return JSONResponse({"detail": detail}, status_code=exc.status_code, headers=getattr(exc, "headers", None))
+
+
+# Antworten mit Meldungen aus dem Backend (Aufgaben, Prüfen, Suche, Quellen, Hörverlauf) in der Sprache der Oberfläche
+TRANSLATE = re.compile(r"^/api/(tasks|review|downloads|settings|listening|series/\d+|singles/.+|books/\d+/.+|cleanup.*|convert.*|libsplit.*|activity)$")
+
+
+@app.middleware("http")
+async def translate_messages(request: Request, call_next):
+    response = await call_next(request)
+    if i18n.pick(request.headers.get("x-abw-lang")) != "en" or not TRANSLATE.match(request.url.path) \
+            or not response.headers.get("content-type", "").startswith("application/json"):
+        return response
+    body = b"".join([chunk async for chunk in response.body_iterator])
+    try:
+        data = i18n.tr_tree(json.loads(body), "en")
+    except ValueError:
+        return Response(body, status_code=response.status_code, media_type="application/json")
+    headers = {k: v for k, v in response.headers.items() if k.lower() not in ("content-length", "content-type")}
+    return JSONResponse(data, status_code=response.status_code, headers=headers)
 
 
 @app.middleware("http")
@@ -1021,7 +1041,7 @@ def review():
             warn = sorted((x for x in d["checks"] if x["status"] != "ok"), key=lambda x: x["name"] != "Sprecher")
             narr_ok = next((x["text"] for x in d["checks"] if x["name"] == "Sprecher" and x["status"] == "ok"), "")
             problems = (d["plan"] or {}).get("problems") or []
-            d["why"] = (problems[0] if problems else d["error"] or (f"{warn[0]['name']}: {warn[0]['text']}" + (f". {narr_ok}" if narr_ok and warn[0]["name"] == "Laufzeit" else "") if warn
+            d["why"] = (problems[0] if problems else d["error"] or (f"{i18n.tr(warn[0]['name'])}: {i18n.tr(warn[0]['text'])}" + (f". {narr_ok}" if narr_ok and warn[0]["name"] == "Laufzeit" else "") if warn
                         else "Prüfung bestanden. Die automatische Ablage ist ausgeschaltet." if db.setting("auto_import") != "1"
                         else "Prüfung bestanden. Wird beim nächsten Prüflauf automatisch abgelegt."))
             d["kind"] = "blocked" if problems else "upgrade" if d.get("replaces") else "hint" if d["state"] == "review" else "ready"

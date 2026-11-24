@@ -7,7 +7,7 @@ A self-hosted companion for [Audiobookshelf](https://www.audiobookshelf.org/) â€
 
 [![CI](https://github.com/moritzfrey95-beep/audiobook-wizarrd/actions/workflows/ci.yml/badge.svg)](https://github.com/moritzfrey95-beep/audiobook-wizarrd/actions/workflows/ci.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.6.0-8b74ff)
+![Version](https://img.shields.io/badge/version-0.6.1-8b74ff)
 ![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)
 ![Languages](https://img.shields.io/badge/UI-English%20%7C%20Deutsch-555)
 
@@ -136,8 +136,10 @@ All screenshots use a demo library with made-up users.
 | <img src="docs/screenshots/calendar.png" alt="Calendar" width="440"> | <img src="docs/screenshots/listening.png" alt="Listening history" width="440"> |
 | **Statistics** | **My ratings** |
 | <img src="docs/screenshots/stats.png" alt="Statistics" width="440"> | <img src="docs/screenshots/myratings.png" alt="My ratings" width="440"> |
-| **Tasks & automation** | **Setup wizard** |
-| <img src="docs/screenshots/tasks.png" alt="Tasks" width="440"> | <img src="docs/screenshots/wizard.png" alt="Setup wizard" width="440"> |
+| **Review: what needs your decision** | **Tasks & automation** |
+| <img src="docs/screenshots/review.png" alt="Review" width="440"> | <img src="docs/screenshots/tasks.png" alt="Tasks" width="440"> |
+| **Setup wizard** | |
+| <img src="docs/screenshots/wizard.png" alt="Setup wizard" width="440"> | |
 
 ### On the phone
 

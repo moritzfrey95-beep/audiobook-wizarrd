@@ -32,3 +32,20 @@ def test_meldungen_uebersetzt():
     assert i18n.tr("Dune, Band 2: Dune Messiah", "en") == "Dune, volume 2: Dune Messiah"
     assert i18n.tr("Alex empfiehlt dir «Red Rising»", "en") == "Alex recommends “Red Rising” to you"
     assert i18n.tr("Neue Serie von Brandon Sanderson", "en") == "New series by Brandon Sanderson"
+
+
+def test_antworten_mit_meldungen_uebersetzt():
+    from fastapi.testclient import TestClient
+    from abw import api, i18n
+    client = TestClient(api.app)
+    de = client.get("/api/tasks").json()
+    en = client.get("/api/tasks", headers={"X-ABW-Lang": "en"}).json()
+    names = {t["key"]: t["name"] for t in en["tasks"]}
+    assert names["verify"] == "Arrival check" and {t["key"]: t["name"] for t in de["tasks"]}["verify"] == "Ankunftsprüfung"
+    tree = i18n.tr_tree({"checks": [{"name": "Laufzeit", "text": "Laufzeit passt nicht zu Audible (76 min statt 79 min)"}],
+                         "title": "Laufzeit", "reasons": [{"text": "Titel passt", "points": 40}]}, "en")
+    assert tree["checks"][0] == {"name": "Runtime", "text": "The duration does not match Audible’s (76 min instead of 79 min)"} or \
+        tree["checks"][0]["name"] == "Runtime"
+    assert tree["title"] == "Laufzeit"  # Titel bleiben unberührt
+    assert tree["reasons"][0]["text"] == "Title matches"
+    assert i18n.tr("Dune: Der Wüstenplanet", "en") == "Dune: Der Wüstenplanet"  # allgemeine Vorlagen greifen nicht

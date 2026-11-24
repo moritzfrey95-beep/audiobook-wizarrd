@@ -36,7 +36,7 @@ const tooOld = (r: Result, book: BookInfo | undefined, searchedAt: string) => {
   return uploaded < new Date(book.release_date).getTime() - DAY
 }
 const size = (b: number | null) => !b ? '–' : b > 1e9 ? t('{{v0}} GB', { v0: (b / 1e9).toLocaleString(locale(), { maximumFractionDigits: 1 }) }) : t('{{v0}} MB', { v0: Math.round(b / 1e6) })
-const age = (d: number | null) => d == null ? '' : d < 1 ? 'heute' : d < 60 ? t('vor {{v0}} Tagen', { v0: d }) : d < 730 ? t('vor {{v0}} Monaten', { v0: Math.round(d / 30) }) : t('vor {{v0}} Jahren', { v0: Math.round(d / 365) })
+const age = (d: number | null) => d == null ? '' : d < 1 ? t('heute') : d < 60 ? t('vor {{v0}} Tagen', { v0: d }) : d < 730 ? t('vor {{v0}} Monaten', { v0: Math.round(d / 30) }) : t('vor {{v0}} Jahren', { v0: Math.round(d / 365) })
 
 function ResultRow({ r, canStart, onStart, onHide }: { r: Result; canStart: boolean; onStart: () => void; onHide: () => void }) {
   const [open, setOpen] = useState(r.verdict !== 'verworfen')

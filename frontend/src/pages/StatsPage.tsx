@@ -170,7 +170,7 @@ function RatingStats() {
       ) : (
         <>
           <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Tile label={t('Bewertet')} value={fmtNum(r.rated)} sub={r.skipped ? `${fmtNum(r.skipped)} bewusst nicht bewertet` : undefined} />
+            <Tile label={t('Bewertet')} value={fmtNum(r.rated)} sub={r.skipped ? t('{{n}} bewusst nicht bewertet', { n: fmtNum(r.skipped) }) : undefined} />
             <Tile label={t('Schnitt')} value={`${(r.average ?? 0).toLocaleString(locale())} ★`} />
             {r.open != null && <Tile label={t('Noch offen')} value={fmtNum(r.open)} sub={t('gehört, aber nicht bewertet')} />}
           </div>

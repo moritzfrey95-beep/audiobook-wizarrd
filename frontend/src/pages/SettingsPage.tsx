@@ -285,7 +285,7 @@ function UsersPanel({ users, meId, minLength, onChange }: { users: User[]; meId:
               <span className="block truncate text-sm font-semibold">{u.name}{u.id === meId && <span className="font-normal text-muted"> {t('(du)')}</span>}</span>
               <span className="block text-xs text-muted">
                 {u.role === 'admin' ? t('Administrator') : t('Benutzer')}{u.goodreads ? t(' · Goodreads verknüpft') : ''}
-                {u.abs_user_id ? t(' · Audiobookshelf: {{v0}}{{v1}}{{v2}}', { v0: u.abs_name, v1: u.abs_active ? '' : ' (dort gesperrt oder gelöscht)', v2: u.has_password ? '' : ', Passwort von dort' }) : ''}
+                {u.abs_user_id ? t(' · Audiobookshelf: {{v0}}{{v1}}{{v2}}', { v0: u.abs_name, v1: u.abs_active ? '' : t(' (dort gesperrt oder gelöscht)'), v2: u.has_password ? '' : t(', Passwort von dort') }) : ''}
               </span>
             </span>
             {u.id !== meId && (
@@ -391,7 +391,7 @@ function ConnectionsSection({ onChange }: { onChange: () => void }) {
             <button type="button" onClick={() => setOpen(open === g.key ? null : g.key)} aria-expanded={open === g.key}
               className="flex min-h-11 w-full items-center justify-between rounded-xl border border-line bg-surface px-4 text-left text-sm font-semibold hover:bg-surface-2">
               <span>{g.title}</span>
-              <span className="text-xs font-normal text-muted">{filled(g) ? 'eingerichtet' : g.optional ? t('optional, nicht eingerichtet') : t('nicht eingerichtet')}</span>
+              <span className="text-xs font-normal text-muted">{filled(g) ? t('eingerichtet') : g.optional ? t('optional, nicht eingerichtet') : t('nicht eingerichtet')}</span>
             </button>
             {open === g.key && <div className="mt-2"><GroupForm group={g} cfg={c} onSaved={() => { cfg.reload(); onChange() }} /></div>}
           </div>
@@ -440,7 +440,7 @@ export default function SettingsPage() {
               <li key={s.name} className={`${box} flex items-start gap-3`}>
                 {s.ok ? <CheckCircle2 size={18} className="mt-0.5 shrink-0" style={{ color: 'var(--ok)' }} aria-hidden /> : <CircleSlash size={18} className="mt-0.5 shrink-0 text-faint" aria-hidden />}
                 <div>
-                  <p className="text-sm font-semibold">{s.name} <span className="font-normal text-muted">({s.ok ? 'eingerichtet' : t('nicht eingerichtet')})</span></p>
+                  <p className="text-sm font-semibold">{s.name} <span className="font-normal text-muted">({s.ok ? t('eingerichtet') : t('nicht eingerichtet')})</span></p>
                   <p className="text-sm text-muted">{s.hint}</p>
                 </div>
               </li>

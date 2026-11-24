@@ -70,7 +70,7 @@ function BookLine({ b, right, sub }: { b: Meta; right?: React.ReactNode; sub?: R
 /** Hörzeit pro Tag oder Monat als Säulen; eine Reihe, darum ohne Legende. */
 function Timeline({ rows, period }: { rows: Listening['timeline']; period: Period }) {
   const max = Math.max(1, ...rows.map(r => r.seconds))
-  const tip = (r: Listening['timeline'][number]) => `${period === 'year' ? `${MONTHS[Number(r.key.slice(5)) - 1]} ${r.key.slice(0, 4)}` : fmtDay(r.key)}: ${r.seconds ? fmtDur(r.seconds) : 'nichts'}`
+  const tip = (r: Listening['timeline'][number]) => `${period === 'year' ? `${MONTHS[Number(r.key.slice(5)) - 1]} ${r.key.slice(0, 4)}` : fmtDay(r.key)}: ${r.seconds ? fmtDur(r.seconds) : t('nichts')}`
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-surface p-4">
       <div className={period === 'month' ? 'min-w-[620px]' : ''}>
@@ -102,7 +102,7 @@ function Heat({ heat }: { heat: number[][] }) {
           {heat.map((row, d) => [
             <span key={`l${d}`} className="text-xs text-muted">{DAYS[d]}</span>,
             ...row.map((v, h) => (
-              <span key={`${d}-${h}`} title={t('{{v0}} {{v1}}–{{v2}} Uhr: {{v3}}', { v0: DAYS[d], v1: h, v2: h + 1, v3: v ? fmtDur(v) : 'nichts' })}
+              <span key={`${d}-${h}`} title={t('{{v0}} {{v1}}–{{v2}} Uhr: {{v3}}', { v0: DAYS[d], v1: h, v2: h + 1, v3: v ? fmtDur(v) : t('nichts') })}
                 className="aspect-square rounded-[3px] bg-surface-2"
                 style={v ? { background: `color-mix(in oklab, var(--accent) ${15 + (v / max) * 85}%, var(--surface-2))` } : undefined} />
             )),
@@ -159,7 +159,7 @@ export default function ListeningPage() {
           <Tile label={t('Hörzeit')} value={fmtBig(s.seconds)} sub={trend(s.seconds, s.prev_seconds, label)} />
           <Tile label={t('Bücher')} value={fmtNum(s.books)} sub={t('{{v0}} beendet, {{v1}} Sitzungen', { v0: fmtNum(s.finished), v1: fmtNum(s.sessions) })} />
           <Tile label={t('Tage mit Hören')} value={`${s.days}/${d.range.days}`} sub={t(s.streak === 1 ? 'Längste Folge im Zeitraum: 1 Tag{{v2}}' : 'Längste Folge im Zeitraum: {{v0}} Tage{{v2}}', { v0: s.streak, v2: s.current_streak != null && one ? t(', aktuell {{v0}}', { v0: s.current_streak }) : '' })} />
-          <Tile label={t('Pro Tag mit Hören')} value={s.days ? fmtBig(s.seconds / s.days) : '–'} sub={one ? t('Zuletzt gehört: {{v0}}', { v0: one.last ? fmtWhen(one.last) : 'nie' }) : t('{{v0}} von {{v1}} Konten haben gehört', { v0: s.listeners, v1: d.users.length })} />
+          <Tile label={t('Pro Tag mit Hören')} value={s.days ? fmtBig(s.seconds / s.days) : '–'} sub={one ? t('Zuletzt gehört: {{v0}}', { v0: one.last ? fmtWhen(one.last) : t('nie') }) : t('{{v0}} von {{v1}} Konten haben gehört', { v0: s.listeners, v1: d.users.length })} />
         </div>
         {!empty && (
           <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -206,7 +206,7 @@ export default function ListeningPage() {
       {!empty && <>
         <Section title={t('Hörzeit im Verlauf')} hint={period === 'year' ? t('Pro Monat') : t('Pro Tag')}><Timeline rows={d.timeline} period={period} /></Section>
         <div className="grid grid-cols-1 gap-x-6 lg:grid-cols-2">
-          <Section title={t('Am meisten gehört')} hint={t('{{v0}} Büchern', { v0: d.books.length < s.books ? `Top ${d.books.length} von ${s.books}` : `${s.books}` })}>
+          <Section title={t('Am meisten gehört')} hint={d.books.length < s.books ? t('Top {{v0}} von {{v1}} Büchern', { v0: d.books.length, v1: s.books }) : t('{{v0}} Büchern', { v0: s.books })}>
             <ul className="rounded-xl border border-line bg-surface">
               {d.books.slice(0, 10).map(b => (
                 <BookLine key={b.item_id} b={b}

@@ -22,7 +22,7 @@ export default function SinglesDetailPage() {
   if (error && !g) return <Page title={t('Einzelbücher')}><ErrorBox message={error} onRetry={reload} /></Page>
   if (!g) return <Page title={t('Einzelbücher werden geladen')}><div className="skeleton h-40 rounded-2xl" /></Page>
   const open = g.books.filter(b => SEARCHABLE.includes(b.state))
-  const note = (b: SingleDetail['books'][number]) => b.added_by ? t('Hinzugefügt von {{v0}}{{v1}}', { v0: b.added_by, v1: b.added_at ? ` am ${fmtDate(b.added_at)}` : '' }) : ''
+  const note = (b: SingleDetail['books'][number]) => b.added_by ? t('Hinzugefügt von {{v0}}{{v1}}', { v0: b.added_by, v1: b.added_at ? t(' am {{date}}', { date: fmtDate(b.added_at) }) : '' }) : ''
   return (
     <main className="mx-auto w-full max-w-[1600px] px-4 pb-16 pt-5 sm:px-6 lg:px-8">
       <Link to="/" className="inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-muted hover:text-text"><ArrowLeft size={15} aria-hidden />{t('Alle Serien')}</Link>

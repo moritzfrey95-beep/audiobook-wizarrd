@@ -33,7 +33,7 @@ export function CleanupPanel() {
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm"><span className="font-semibold">{data.candidates.length} {t('Ordner,')}{' '}{mb(total)}</span> <span className="text-muted">{t('werden nicht mehr gebraucht.')}</span></p>
-              <Button disabled={busy !== null} onClick={() => act('/cleanup/run', 'run', r => `${r.moved} Ordner in den Papierkorb verschoben (${mb(r.bytes)}).`)}>
+              <Button disabled={busy !== null} onClick={() => act('/cleanup/run', 'run', r => t('{{n}} Ordner in den Papierkorb verschoben ({{size}}).', { n: r.moved, size: mb(r.bytes) }))}>
                 {busy === 'run' ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Archive size={15} aria-hidden />}{t('In den Papierkorb verschieben')}
               </Button>
             </div>
@@ -53,7 +53,7 @@ export function CleanupPanel() {
           {t('Papierkorb:')}{' '}{data.trash.length} {t('Ordner,')}{' '}{mb(trashTotal)}{t('. Davon')}{' '}{old.length} {t('älter als')}{' '}{data.keep_days} {t('Tage.')}
         </p>
         <Button disabled={busy !== null || old.length === 0}
-          onClick={async () => (await ask(`${old.length} Ordner endgültig löschen? Das lässt sich nicht rückgängig machen.`, 'Endgültig löschen')) && act('/cleanup/purge', 'purge', r => `${r.removed} Ordner endgültig gelöscht (${mb(r.bytes)}).`)}
+          onClick={async () => (await ask(t('{{n}} Ordner endgültig löschen? Das lässt sich nicht rückgängig machen.', { n: old.length }), t('Endgültig löschen'))) && act('/cleanup/purge', 'purge', r => t('{{n}} Ordner endgültig gelöscht ({{size}}).', { n: r.removed, size: mb(r.bytes) }))}
           title={old.length ? undefined : t('Erst nach {{v0}} Tagen im Papierkorb möglich', { v0: data.keep_days })}>
           {busy === 'purge' ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Trash2 size={15} aria-hidden />}{t('Ältere endgültig löschen')}
         </Button>
