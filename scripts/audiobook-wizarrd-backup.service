@@ -1,0 +1,6 @@
+[Unit]
+Description=AudioBook Wizarrd: Datenbank aufs NAS sichern
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/audiobook-wizarrd/scripts/nightly_backup.py --db %h/audiobook-wizarrd/data/abw.db --repo %h/audiobook-wizarrd --target /pfad/zum/sicherungsziel

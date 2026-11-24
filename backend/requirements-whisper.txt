@@ -1,0 +1,2 @@
+# Optional: Spracherkennung der Ansage bei der Ankunftsprüfung (Image mit ABW_WHISPER=1)
+faster-whisper==1.2.1

@@ -1,0 +1,20 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Steps to reproduce
+  - type: input
+    attributes:
+      label: ABW version (profile menu, bottom)
+  - type: textarea
+    attributes:
+      label: Log excerpt (docker logs audiobook-wizarrd)
+      description: Remove API keys, passwords and addresses before posting.
+      render: text

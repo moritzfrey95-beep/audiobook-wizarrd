@@ -1,0 +1,52 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/bricolage-grotesque";
+
+/* Farben als Tokens: dunkel ist Standard, hell per data-theme oder Systemeinstellung */
+:root {
+  color-scheme: dark;
+  --bg: #0a0c11; --surface: #12151d; --surface-2: #1a1e29; --line: #272c3a;
+  --text: #eceef4; --muted: #9aa3b5; --faint: #6b7487;
+  --accent: #8b74ff; --accent-strong: #7c5cff; --on-accent: #ffffff;
+  --ok: #3ddc97; --warn: #fbbf24; --info: #5ab4ff; --search: #2dd4bf; --load: #a78bfa; --bad: #ff6b6b; --review: #fb923c;
+  --user: #f472b6; --user-strong: #db2777;
+  --shadow: 0 10px 30px -12px rgba(0,0,0,.7);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f5f6fa; --surface: #ffffff; --surface-2: #eef0f6; --line: #dcdfe9;
+  --text: #171a23; --muted: #555d70; --faint: #7b8395;
+  --accent: #6a4df5; --accent-strong: #5b3df0; --on-accent: #ffffff;
+  --ok: #0f8a55; --warn: #a16207; --info: #1d6fd1; --search: #0f766e; --load: #6d47e6; --bad: #c92a2a; --review: #c2410c;
+  --user: #be185d; --user-strong: #be185d;
+  --shadow: 0 10px 30px -14px rgba(30,35,60,.25);
+}
+@theme inline {
+  --color-bg: var(--bg); --color-surface: var(--surface); --color-surface-2: var(--surface-2); --color-line: var(--line);
+  --color-text: var(--text); --color-muted: var(--muted); --color-faint: var(--faint);
+  --color-accent: var(--accent); --color-accent-strong: var(--accent-strong); --color-on-accent: var(--on-accent);
+  --color-ok: var(--ok); --color-warn: var(--warn); --color-info: var(--info); --color-search: var(--search);
+  --color-load: var(--load); --color-bad: var(--bad); --color-review: var(--review);
+  --color-user: var(--user); --color-user-strong: var(--user-strong);
+  --font-sans: "Inter Variable", system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque Variable", "Inter Variable", system-ui, sans-serif;
+}
+html { background: var(--bg); overflow-x: clip; overscroll-behavior: none; }
+body { margin: 0; overflow-x: clip; background: var(--bg); color: var(--text); font-family: var(--font-sans); font-size: 15px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01"; }
+/* Handy/Tablet: nur der Inhaltsbereich scrollt, die Seite selbst nie (siehe Shell in App.tsx) */
+@media (max-width: 1023.98px) { html.abw-app, html.abw-app body { overflow: hidden; height: 100%; } }
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; }
+button, a, [role="button"], summary, select { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.tabular { font-variant-numeric: tabular-nums; }
+.card-grid > * { content-visibility: auto; contain-intrinsic-size: 320px; }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.pulse { animation: pulse-dot 1.6s ease-in-out infinite; }
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+.skeleton { position: relative; overflow: hidden; background: var(--surface-2); }
+.skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 6%, transparent), transparent); animation: shimmer 1.4s infinite; }
+@media (prefers-reduced-motion: reduce) { .pulse, .skeleton::after { animation: none; } * { transition-duration: 0ms !important; } }
+::-webkit-scrollbar { width: 10px; height: 10px; } ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
