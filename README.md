@@ -7,7 +7,7 @@ A self-hosted companion for [Audiobookshelf](https://www.audiobookshelf.org/) â€
 
 [![CI](https://github.com/moritzfrey95-beep/audiobook-wizarrd/actions/workflows/ci.yml/badge.svg)](https://github.com/moritzfrey95-beep/audiobook-wizarrd/actions/workflows/ci.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.7.0-8b74ff)
+![Version](https://img.shields.io/badge/version-0.7.1-8b74ff)
 ![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)
 ![Languages](https://img.shields.io/badge/UI-English%20%7C%20Deutsch-555)
 
@@ -139,14 +139,16 @@ All screenshots use a demo library with made-up users.
 | <img src="docs/screenshots/foryou.png" alt="For you" width="440"> | <img src="docs/screenshots/toplists.png" alt="Top lists" width="440"> |
 | **Rate what you heard** | **Top list per tag** |
 | <img src="docs/screenshots/rate.png" alt="Rate" width="440"> | <img src="docs/screenshots/tagtop.png" alt="Top list per tag" width="440"> |
-| **Authors** | **Notifications** |
+| **Authors, with merge suggestions** | **Notifications** |
 | <img src="docs/screenshots/authors.png" alt="Authors" width="440"> | <img src="docs/screenshots/notifications.png" alt="Notifications" width="440"> |
-| **Release calendar** | **Listening history** |
+| **Release calendar and calendar subscription** | **Listening history** |
 | <img src="docs/screenshots/calendar.png" alt="Calendar" width="440"> | <img src="docs/screenshots/listening.png" alt="Listening history" width="440"> |
 | **Statistics** | **My ratings** |
 | <img src="docs/screenshots/stats.png" alt="Statistics" width="440"> | <img src="docs/screenshots/myratings.png" alt="My ratings" width="440"> |
 | **Review: what needs your decision** | **Tasks & automation** |
 | <img src="docs/screenshots/review.png" alt="Review" width="440"> | <img src="docs/screenshots/tasks.png" alt="Tasks" width="440"> |
+| **Choose which notifications you get** | **API keys and download clients (admin)** |
+| <img src="docs/screenshots/notify-settings.png" alt="Notification settings" width="440"> | <img src="docs/screenshots/connections.png" alt="API keys and connections" width="440"> |
 | **Setup wizard** | |
 | <img src="docs/screenshots/wizard.png" alt="Setup wizard" width="440"> | |
 
