@@ -4,6 +4,8 @@ import { Search } from 'lucide-react'
 import { useData } from '../api'
 import { Chip, Cover, Empty, ErrorBox, LangTag, Page, SkeletonGrid } from '../ui'
 import { t } from '../i18n'
+import { useAdmin } from '../session'
+import { DuplicateAuthors } from '../AuthorMerge'
 
 export interface AuthorTile {
   key: string; name: string; en: number; de: number; hours: number; series_count: number; more_series: number
@@ -15,6 +17,7 @@ export default function AuthorsPage() {
   const [q, setQ] = useState('')
   const [only, setOnly] = useState<'all' | 'both' | 'more'>('all')
   const [shown, setShown] = useState(60)
+  const admin = useAdmin()
   const list = useMemo(() => (data ?? []).filter(a =>
     a.name.toLowerCase().includes(q.trim().toLowerCase()) &&
     (only === 'all' || (only === 'both' ? a.en > 0 && a.de > 0 : a.more_series > 0))), [data, q, only])
@@ -33,6 +36,7 @@ export default function AuthorsPage() {
           <Chip active={only === 'more'} onClick={() => setOnly('more')}>{t('Mit weiteren Serien bei Audible')}</Chip>
         </div>
       </div>
+      {admin && <DuplicateAuthors onChange={reload} />}
       {error && !data ? <ErrorBox message={error} onRetry={reload} /> : loading && !data ? <SkeletonGrid n={12} />
         : list.length === 0 ? <Empty title={t('Kein Autor gefunden')} text={t('Prüfe die Schreibweise oder wähle den Filter «Alle».')} />
         : (

@@ -266,3 +266,60 @@ def session_ok(token: str | None) -> bool:
 def logout(token: str | None) -> None:
     if token:
         db.conn().execute("DELETE FROM session WHERE token_hash=?", (_digest(token),))
+
+
+# ---------- Kalender-Abo und API-Schlüssel ----------
+
+def _stamp() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def feed_token(user_id: int, renew: bool = False) -> str:
+    """Schlüssel für das Kalender-Abo des Benutzers; entsteht beim ersten Abruf. renew: alter Link hört auf zu gehen."""
+    c = db.conn()
+    if renew:
+        c.execute("DELETE FROM user_token WHERE user_id=? AND kind='ics'", (user_id,))
+    row = c.execute("SELECT token FROM user_token WHERE user_id=? AND kind='ics'", (user_id,)).fetchone()
+    if row:
+        return row["token"]
+    token = secrets.token_urlsafe(24)
+    c.execute("INSERT INTO user_token(user_id, kind, token_hash, token, created) VALUES(?,?,?,?,?)", (user_id, "ics", _digest(token), token, _stamp()))
+    return token
+
+
+def token_user(token: str | None, kind: str) -> dict | None:
+    """Benutzer zu einem Kalender- oder API-Schlüssel; merkt die letzte Verwendung."""
+    if not token:
+        return None
+    c = db.conn()
+    row = c.execute("SELECT t.id AS token_id, t.user_id, u.id, u.name, u.role FROM user_token t LEFT JOIN user u ON u.id=t.user_id"
+                    " WHERE t.token_hash=? AND t.kind=?", (_digest(token), kind)).fetchone()
+    if not row:
+        return None
+    if row["id"] is None:  # ohne Benutzerkonten (kein Passwort) gehört alles Benutzer 1
+        if row["user_id"] != OPEN_USER["id"] or enabled():
+            return None
+        user = dict(OPEN_USER)
+    else:
+        user = _public(row)
+    c.execute("UPDATE user_token SET last_used=? WHERE id=?", (_stamp(), row["token_id"]))
+    return user
+
+
+def create_api_key(user_id: int, name: str) -> str:
+    """Neuer API-Schlüssel. Er wird nur dieses eine Mal im Klartext gezeigt."""
+    name = (name or "").strip()[:60] or "API"
+    key = "abw_" + secrets.token_urlsafe(32)
+    db.conn().execute("INSERT INTO user_token(user_id, kind, token_hash, name, hint, created) VALUES(?,?,?,?,?,?)",
+                      (user_id, "api", _digest(key), name, key[-4:], _stamp()))
+    return key
+
+
+def api_keys(user_id: int) -> list[dict]:
+    return [dict(r) for r in db.conn().execute(
+        "SELECT id, name, hint, created, last_used FROM user_token WHERE user_id=? AND kind='api' ORDER BY id", (user_id,))]
+
+
+def delete_api_key(user_id: int, key_id: int) -> bool:
+    return bool(db.conn().execute("DELETE FROM user_token WHERE id=? AND user_id=? AND kind='api'", (key_id, user_id)).rowcount)

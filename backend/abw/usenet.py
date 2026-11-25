@@ -24,6 +24,10 @@ def configured() -> bool:
 
 
 def sab_configured() -> bool:
+    """Ist ein Usenet-Client eingerichtet (SABnzbd oder NZBGet)?"""
+    from . import dlclients
+    if dlclients.usenet_client() == "nzbget":
+        return bool(config.SAB_URL and config.secret("NZBGET_USERNAME"))
     return bool(config.SAB_URL and config.secret("SABNZBD_API_KEY"))
 
 
@@ -189,6 +193,9 @@ def _sab(mode: str, files=None, **params) -> dict:
 
 
 def submit(nzb: bytes, marker: str) -> str:
+    from . import dlclients
+    if dlclients.usenet_client() == "nzbget":
+        return dlclients.NZBGet().submit(nzb, marker)
     d = _sab("addfile", files={"name": ("download.nzb", nzb, "application/x-nzb")},
              nzbname=marker, cat=config.SAB_CATEGORY, priority=0)
     ids = d.get("nzo_ids") or []
@@ -198,7 +205,10 @@ def submit(nzb: bytes, marker: str) -> str:
 
 
 def status(ids: set[str]) -> dict[str, dict]:
-    """Stand der eigenen Aufträge in SABnzbd: state queued|downloading|arrived|failed, progress, path, error."""
+    """Stand der eigenen Aufträge in SABnzbd (oder NZBGet): state queued|downloading|arrived|failed, progress, path, error."""
+    from . import dlclients
+    if dlclients.usenet_client() == "nzbget":
+        return dlclients.NZBGet().status(ids)
     out: dict[str, dict] = {}
     for slot in _sab("queue", limit=500).get("queue", {}).get("slots", []):
         if slot.get("nzo_id") in ids:

@@ -6,7 +6,7 @@ import { locale, t } from './i18n'
 interface Unsure { book_id: number; title: string; sequence: string | null; lang: string; series: string; series_id: number; unsure: number; last_search: string }
 interface Damaged { book_id: number; title: string; series: string | null; series_id: number | null; detail: string; download_state: string | null }
 interface Integrity { total: number; checked: number; ok: number; errors: number; damaged: Damaged[] }
-interface Auto { auto_integrity: boolean; integrity: Integrity; auto_ebook: boolean; auto_ebook_upcoming: boolean; auto_ebook_listening: boolean; notify_ebook: boolean; auto_author_series: boolean; auto_convert: boolean; auto_chapters: boolean; notify: boolean; notify_configured: boolean; auto_cleanup: boolean; auto_search: boolean; auto_import: boolean; batch: number; open: number; due: number; never: number; unsure: Unsure[]; import_enabled: boolean }
+interface Auto { auto_embed: boolean; embed: { ok: number; failed: number; busy: number; open: number }; auto_integrity: boolean; integrity: Integrity; auto_ebook: boolean; auto_ebook_upcoming: boolean; auto_ebook_listening: boolean; notify_ebook: boolean; auto_author_series: boolean; auto_convert: boolean; auto_chapters: boolean; notify: boolean; notify_configured: boolean; auto_cleanup: boolean; auto_search: boolean; auto_import: boolean; batch: number; open: number; due: number; never: number; unsure: Unsure[]; import_enabled: boolean }
 
 export function Switch({ on, onChange, label, hint, disabled }: { on: boolean; onChange: (v: boolean) => void; label: string; hint: string; disabled?: boolean }) {
   return (
@@ -33,7 +33,7 @@ export function AutomationPanel() {
   const { data, reload } = useData<Auto>('/automation', 10000)
   const [err, setErr] = useState<string | null>(null)
   if (!data) return <div className="skeleton h-40 rounded-xl" />
-  const set = async (body: Partial<Pick<Auto, 'auto_integrity' | 'auto_search' | 'auto_import' | 'auto_cleanup' | 'auto_convert' | 'auto_chapters' | 'notify' | 'auto_ebook' | 'auto_ebook_upcoming' | 'auto_ebook_listening' | 'notify_ebook' | 'auto_author_series'>>) => {
+  const set = async (body: Partial<Pick<Auto, 'auto_embed' | 'auto_integrity' | 'auto_search' | 'auto_import' | 'auto_cleanup' | 'auto_convert' | 'auto_chapters' | 'notify' | 'auto_ebook' | 'auto_ebook_upcoming' | 'auto_ebook_listening' | 'notify_ebook' | 'auto_author_series'>>) => {
     setErr(null)
     try { await api('/automation', { method: 'POST', body: JSON.stringify(body) }); reload() } catch (e) { setErr((e as Error).message) }
   }
@@ -50,6 +50,8 @@ export function AutomationPanel() {
           hint={t('Wandelt jede Stunde ein Buch aus vielen Dateien in eine M4B mit Kapiteln um, kleinste zuerst. Die Originale gehen in den Papierkorb.')} />
         <Switch on={data.auto_chapters} onChange={v => set({ auto_chapters: v })} label={t('Kapitel ergänzen')}
           hint={t('Setzt bei Büchern aus einer Datei ohne Kapitel die Kapitel von Audible in Audiobookshelf, wenn die Laufzeit passt. Die Datei bleibt unverändert.')} />
+        <Switch on={data.auto_embed} onChange={v => set({ auto_embed: v })} label={t('Metadaten in die Dateien schreiben')}
+          hint={t('Lässt Audiobookshelf Titel, Autor, Sprecher, Serie, Beschreibung, Cover und Kapitel in die Audiodateien der von ABW abgelegten und gematchten Bücher einbetten und prüft danach die Tags. Verändert die Dateien. Eingebettet: {{v0}}, offen: {{v1}}, fehlgeschlagen: {{v2}}.', { v0: data.embed.ok, v1: data.embed.open + data.embed.busy, v2: data.embed.failed })} />
         <Switch on={data.auto_ebook} onChange={v => set({ auto_ebook: v })} label={t('E-Books zu neuen Hörbüchern laden')}
           hint={t('Sucht alle 30 Minuten zu drei von ABW abgelegten Hörbüchern das EPUB (Usenet, sonst EBookBay und Internet Archive). Jedes EPUB wird nach dem Download geprüft und kommt als neue Datei in den Buchordner.')} />
         <Switch on={data.auto_ebook_listening} onChange={v => set({ auto_ebook_listening: v })} label={t('E-Books zu Serien laden, die gerade gehört werden')}
@@ -63,8 +65,8 @@ export function AutomationPanel() {
         <Switch on={data.auto_integrity} onChange={v => set({ auto_integrity: v })} label={t('Bestand auf Schäden prüfen')}
           hint={t('Liest nachts (01–07 Uhr) jede Hörbuchdatei einmal ganz und sucht Lücken aus Null-Bytes, wie sie unfertige Torrents hinterlassen. Beschädigte Bücher werden neu gesucht und nach bestandener Prüfung ersetzt. Geprüft: {{v0}} von {{v1}} Büchern.', { v0: data.integrity.checked.toLocaleString(locale()), v1: data.integrity.total.toLocaleString(locale()) })} />
         <div>
-          <Switch on={data.notify} onChange={v => set({ notify: v })} disabled={!data.notify_configured} label={t('Meldungen über ntfy')}
-            hint={data.notify_configured ? t('Meldet neue Bücher im Bestand, angekündigte Bände und Fälle für das Tab «Prüfen».') : t('ntfy ist noch nicht eingerichtet (Adresse oder Thema fehlt).')} />
+          <Switch on={data.notify} onChange={v => set({ notify: v })} disabled={!data.notify_configured} label={t('Meldungen über ntfy und Webhook')}
+            hint={data.notify_configured ? t('Meldet neue Bücher im Bestand, angekündigte Bände und Fälle für das Tab «Prüfen».') : t('Weder ntfy noch ein Webhook ist eingerichtet (unter Verbindungen, Meldungen).')} />
           {data.notify_configured && (
             <button type="button" className="ml-14 mt-1 min-h-9 text-sm font-medium text-accent underline-offset-4 hover:underline"
               onClick={async () => { setErr(null); try { await api('/notify/test', { method: 'POST' }); setErr(t('Testmeldung gesendet.')) } catch (e) { setErr((e as Error).message) } }}>

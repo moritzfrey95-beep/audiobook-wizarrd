@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { locale, t, uiLang } from './i18n'
 
 export type Lang = 'en' | 'de'
-export type Flag = 'downloading' | 'review' | 'failed' | 'searching' | 'incomplete' | 'upcoming' | 'complete' | 'unknown' | 'single' | 'absent' | 'unmonitored'
+export type Flag = 'downloading' | 'review' | 'failed' | 'searching' | 'incomplete' | 'upcoming' | 'ended' | 'complete' | 'unknown' | 'single' | 'absent' | 'unmonitored'
 export type BookState = 'owned' | 'upcoming' | 'missing' | 'downloading' | 'searching' | 'review' | 'failed'
 
 export interface Book {
@@ -23,7 +23,7 @@ export interface Edition {
 }
 export interface Series {
   id: number; name: string; author: string; author_key: string; cover: string | null; flags: Flag[]; primary: Flag; added_at: string
-  next_release: string | null; missing: number; hours: number; hours_editions?: number; listened: number; owned: number; auto: boolean; editions: Edition[]
+  next_release: string | null; missing: number; hours: number; hours_editions?: number; listened: number; owned: number; auto: boolean; ended?: boolean; editions: Edition[]
   rating: { avg: number; count: number; mine: number | null } | null
   /** Sortierschlüssel wie im Backend (ohne Artikel), damit Einzelbuch-Karten richtig einsortiert werden */
   sort?: string

@@ -767,12 +767,13 @@ def auto_overview() -> dict:
     due = c.execute("SELECT COUNT(*) FROM (" + CANDIDATES + " AND (q.next_search IS NULL OR q.next_search<=:now))", {**p, "now": _now()}).fetchone()[0]
     never = c.execute("SELECT COUNT(*) FROM (" + CANDIDATES + " AND q.book_id IS NULL)", p).fetchone()[0]
     unsure = unsure_books()
-    from . import notify
+    from . import embed, notify
     return {"auto_search": db.setting("auto_search") == "1", "auto_import": db.setting("auto_import") == "1",
             "auto_convert": db.setting("auto_convert") == "1", "auto_chapters": db.setting("auto_chapters") == "1",
-            "notify": db.setting("notify") == "1", "notify_configured": notify.configured(),
+            "notify": db.setting("notify") == "1", "notify_configured": notify.any_configured(),
             "auto_cleanup": db.setting("auto_cleanup") == "1", "auto_ebook": db.setting("auto_ebook") == "1",
             "auto_ebook_upcoming": db.setting("auto_ebook_upcoming") == "1", "auto_ebook_listening": db.setting("auto_ebook_listening") == "1", "notify_ebook": db.setting("notify_ebook") == "1", "auto_author_series": db.setting("auto_author_series") == "1",
             "auto_integrity": db.setting("auto_integrity") == "1", "integrity": integrity.stats(),
+            "auto_embed": db.setting("auto_embed") == "1", "embed": embed.stats(),
             "batch": int(db.setting("auto_batch")), "open": total, "due": due, "never": never, "unsure": unsure,
             "import_enabled": config.IMPORT_ENABLED}

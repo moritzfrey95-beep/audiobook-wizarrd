@@ -120,6 +120,20 @@ CREATE TRIGGER IF NOT EXISTS rating_book_gone AFTER DELETE ON book BEGIN DELETE 
 CREATE TABLE IF NOT EXISTS auto_follow (
     user_id INTEGER NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, created TEXT NOT NULL, PRIMARY KEY(user_id, kind, key)
 );
+-- Schlüssel ausserhalb der Sitzung: «ics» = Kalender-Abo (nur der Kalender, Schlüssel lesbar gespeichert, damit der Link
+-- sich wieder anzeigen lässt), «api» = API-Schlüssel mit den Rechten des Benutzers (nur als Hash gespeichert)
+CREATE TABLE IF NOT EXISTS user_token (
+    id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, kind TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, token TEXT, name TEXT,
+    hint TEXT, created TEXT NOT NULL, last_used TEXT
+);
+-- Zusammengeführte Autoren: derselbe Autor unter einer anderen Schreibweise (Audible führt manche Autoren mehrfach)
+CREATE TABLE IF NOT EXISTS author_alias (alias_norm TEXT PRIMARY KEY, alias_name TEXT NOT NULL, target_name TEXT NOT NULL, created TEXT NOT NULL);
+-- Einstellungen je Benutzer für Meldungen: «off:<Art>» = 1 schaltet eine Meldungsart ab, «digest» = weekly sammelt Push
+CREATE TABLE IF NOT EXISTS notify_pref (user_id INTEGER NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(user_id, key));
+-- Stummgeschaltet: Serie bleibt markiert (Kalender, Liste), meldet aber nichts
+CREATE TABLE IF NOT EXISTS follow_mute (
+    user_id INTEGER NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, created TEXT NOT NULL, PRIMARY KEY(user_id, kind, key)
+);
 CREATE TABLE IF NOT EXISTS push_sub (
     endpoint TEXT PRIMARY KEY, user_id INTEGER NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL, agent TEXT,
     created TEXT NOT NULL, last_ok TEXT, fails INTEGER NOT NULL DEFAULT 0
@@ -214,6 +228,8 @@ MIGRATIONS = [  # (Tabelle, Spalte, Typ) für Spalten, die nach der ersten Versi
     ("book", "abs_match", "TEXT"),  # von ABW abgelegt und in Audiobookshelf mit Audible gematcht: Zeitpunkt, «Fehler: …» oder «offen: {Serien, ASIN}» während des Matches
     ("ebook_job", "seq_ok", "INTEGER"),  # 1 = der Treffer nannte die richtige Bandnummer  # 1 = im Buchordner liegt ein EPUB  # NULL/1 = Automatik folgt dem Hauptschalter, 0 = für diese Serie aus
     ("edition", "kind", "TEXT"),
+    ("series", "ended", "TEXT"),
+    ("book", "embedded", "TEXT"),  # Metadaten in die Dateitags: «gesendet n Zeit», «eingelesen n Zeit», «ok Zeit» oder «Fehler: …»  # Zeitpunkt: Serie vom Autor beendet; Audible wird dann nur noch selten geprüft
     ("edition", "variant", "TEXT"),  # zusätzliche Fassung derselben Sprache («Rob Inglis», «BBC-Hörspiel»); NULL = Hauptfassung
     ("edition", "narr", "TEXT"),  # Sprecher, an den die Fassung gebunden ist
     ("edition", "base_id", "INTEGER"),  # Sprecher-Fassung: Hauptfassung, aus deren Audiobookshelf-Serie die Bücher kommen
@@ -268,7 +284,7 @@ def migrate_users(c) -> None:
     c.execute("UPDATE wishlist_item SET source='gr1' WHERE source='goodreads'")
 
 
-DEFAULTS = {"auto_search": "0", "auto_import": "0", "auto_batch": "10", "auto_cleanup": "0", "auto_convert": "0", "auto_chapters": "0", "notify": "0", "auto_ebook": "0", "auto_ebook_upcoming": "0", "auto_ebook_listening": "1", "notify_ebook": "0", "auto_author_series": "0", "auto_integrity": "0",
+DEFAULTS = {"auto_search": "0", "auto_import": "0", "auto_batch": "10", "auto_cleanup": "0", "auto_convert": "0", "auto_chapters": "0", "notify": "0", "auto_ebook": "0", "auto_ebook_upcoming": "0", "auto_ebook_listening": "1", "notify_ebook": "0", "auto_author_series": "0", "auto_integrity": "0", "auto_embed": "0",
             "setup_done": "0", "rec_mode": "admins", "auth_user": "", "auth_hash": "", "goodreads_user": "", "goodreads_shelf": "to-read"}
 
 

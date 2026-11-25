@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import {
-  AlertTriangle, BookOpen, CalendarClock, CheckCircle2, CircleDashed, CircleHelp, Download, EyeOff, Radar, SearchX, ShieldQuestion,
+  AlertTriangle, BookCheck, BookOpen, CalendarClock, CheckCircle2, CircleDashed, CircleHelp, Download, EyeOff, Radar, SearchX, ShieldQuestion,
   type LucideIcon,
 } from 'lucide-react'
 import type { BookState, Edition, Flag } from './api'
@@ -15,6 +15,7 @@ export const STATUS: Record<Flag | BookState, { label: string; icon: LucideIcon;
   incomplete: { label: t('Unvollständig'), icon: CircleDashed, color: 'var(--warn)' },
   missing: { label: t('Fehlt'), icon: CircleDashed, color: 'var(--warn)' },
   upcoming: { label: t('Neues Buch kommt'), icon: CalendarClock, color: 'var(--info)' },
+  ended: { label: t('Vom Autor beendet'), icon: BookCheck, color: 'var(--ok)' },
   complete: { label: t('Abgeschlossen'), icon: CheckCircle2, color: 'var(--ok)' },
   owned: { label: t('Vorhanden'), icon: CheckCircle2, color: 'var(--ok)' },
   unknown: { label: t('Ungeprüft'), icon: CircleHelp, color: 'var(--faint)' },
@@ -23,8 +24,8 @@ export const STATUS: Record<Flag | BookState, { label: string; icon: LucideIcon;
   unmonitored: { label: t('Nicht überwacht'), icon: EyeOff, color: 'var(--faint)' },
 }
 
-/** «Unvollständig» zeigt schon der Zähler (4/5); der Status bleibt nur zum Filtern. */
-export const shownFlags = <T extends Flag>(flags: T[]): T[] => flags.filter(f => f !== 'incomplete')
+/** «Unvollständig» zeigt schon der Zähler (4/5); der Status bleibt nur zum Filtern. «Beendet» sagt mehr als «Abgeschlossen». */
+export const shownFlags = <T extends Flag>(flags: T[]): T[] => flags.filter(f => f !== 'incomplete' && !(f === 'complete' && flags.includes('ended' as T)))
 
 export function Badge({ status, label, solid }: { status: Flag | BookState; label?: string; solid?: boolean }) {
   const s = STATUS[status]

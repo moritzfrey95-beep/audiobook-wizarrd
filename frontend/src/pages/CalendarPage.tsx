@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { fmtDate, useData } from '../api'
 import { Chip, Cover, Empty, ErrorBox, LangTag, Page } from '../ui'
 import { locale, t } from '../i18n'
+import { CalendarFeed } from '../CalendarFeed'
 
 interface Entry { series_id: number; series: string; lang: string; monitored: boolean; title: string; sequence: string | null; release_date: string | null; cover: string | null; author: string }
 
@@ -18,6 +19,7 @@ export default function CalendarPage() {
   const days = (d: string) => Math.ceil((new Date(d).getTime() - Date.now()) / 86400000)
   return (
     <Page title={t('Kalender')} subtitle={data ? t('{{v0}} angekündigte Bände', { v0: list.length }) : t('Termine werden geladen')}>
+      <div className="mb-4"><CalendarFeed /></div>
       <div className="mb-5 flex gap-2">
         <Chip active={!all} onClick={() => setAll(false)}>{t('Überwachte Fassungen')}</Chip>
         <Chip active={all} onClick={() => setAll(true)}>{t('Alle Sprachen')}</Chip>

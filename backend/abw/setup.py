@@ -54,6 +54,39 @@ def sabnzbd(url: str, key: str) -> dict:
     return {"ok": True, "text": f"Verbunden{', Version ' + v if v else ''}"}
 
 
+def usenet(client: str, url: str, key: str, user: str, password: str) -> dict:
+    if (client or "sabnzbd").lower() != "nzbget":
+        return sabnzbd(url, key)
+    from . import dlclients
+    try:
+        v = dlclients.NZBGet(url, user, password).version()
+    except Exception as exc:  # noqa: BLE001
+        return _fail(exc)
+    return {"ok": True, "text": f"NZBGet verbunden, Version {v}"}
+
+
+def torrent(client: str, url: str, user: str, password: str, debrid_key: str) -> dict:
+    """Gewählten Torrent-Client prüfen: qBittorrent, Transmission, Deluge, Real-Debrid oder TorBox."""
+    from . import dlclients
+    kind = (client or "qbittorrent").lower()
+    if kind not in dlclients.TORRENT_CLIENTS:
+        return {"ok": False, "text": "Unbekannter Torrent-Client"}
+    if kind == "qbittorrent":
+        return qbittorrent(url, user, password)
+    try:
+        if kind == "transmission":
+            v = dlclients.Transmission(url, user, password).version()
+        elif kind == "deluge":
+            v = dlclients.Deluge(url, password).version()
+        elif kind == "realdebrid":
+            v = dlclients.RealDebrid(debrid_key).version()
+        else:
+            v = dlclients.TorBox(debrid_key).version()
+    except Exception as exc:  # noqa: BLE001
+        return _fail(exc)
+    return {"ok": True, "text": f"Verbunden: {v}"}
+
+
 def qbittorrent(url: str, username: str, password: str) -> dict:
     try:
         with httpx.Client(base_url=url.rstrip("/"), timeout=TIMEOUT, headers={"Referer": url}) as c:
@@ -74,6 +107,29 @@ def ntfy(url: str) -> dict:
     except Exception as exc:  # noqa: BLE001
         return _fail(exc)
     return {"ok": True, "text": "ntfy erreichbar"}
+
+
+def notify(ntfy_url: str, webhook_url: str) -> dict:
+    """ntfy auf Erreichbarkeit prüfen; an den Webhook geht eine Testmeldung (anders lässt er sich nicht prüfen)."""
+    from . import notify as notify_mod
+    if not ntfy_url and not webhook_url:
+        return {"ok": False, "text": "Weder ntfy-Adresse noch Webhook eingetragen"}
+    parts, ok = [], True
+    if ntfy_url:
+        r = ntfy(ntfy_url)
+        ok = r["ok"]
+        parts.append(r["text"])
+    if webhook_url:
+        kind = notify_mod.webhook_kind(webhook_url)
+        try:
+            r = httpx.post(webhook_url, json=notify_mod.webhook_payload(kind, "AudioBook Wizarrd", "Testmeldung: Der Webhook funktioniert.", "", "mage"),
+                           timeout=TIMEOUT)
+            r.raise_for_status()
+            parts.append(f"Webhook ({kind}) hat die Testmeldung angenommen")
+        except Exception as exc:  # noqa: BLE001
+            ok = False
+            parts.append("Webhook: " + _fail(exc)["text"])
+    return {"ok": ok, "text": ". ".join(parts)}
 
 
 def flaresolverr(url: str) -> dict:

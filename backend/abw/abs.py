@@ -31,11 +31,30 @@ def split_series(series_name: str | None) -> tuple[str, str | None] | None:
 ROLE = re.compile(r"\s+-\s+(translator|editor|introduction|foreword|afterword|illustrator|contributor|adapter|übersetzer|herausgeber)\b.*$", re.I)
 
 
-def primary_author(name: str | None) -> str:
-    """Erster Name ohne Rollenangabe wie 'X - translator'."""
+_aliases: dict[str, str] | None = None  # Schlüssel einer anderen Schreibweise -> Name, unter dem der Autor geführt wird
+
+
+def author_aliases() -> dict[str, str]:
+    global _aliases
+    if _aliases is None:
+        try:
+            _aliases = {r["alias_norm"]: r["target_name"] for r in db.conn().execute("SELECT alias_norm, target_name FROM author_alias")}
+        except Exception:  # noqa: BLE001 - Tabelle fehlt noch (vor db.init)
+            return {}
+    return _aliases
+
+
+def reset_aliases() -> None:
+    global _aliases
+    _aliases = None
+
+
+def primary_author(name: str | None, resolve: bool = True) -> str:
+    """Erster Name ohne Rollenangabe wie 'X - translator'; zusammengeführte Schreibweisen ergeben den geführten Namen."""
     parts = [p.strip() for p in (name or "").split(",") if p.strip()]
     real = [p for p in parts if not ROLE.search(p)]
-    return (real[0] if real else ROLE.sub("", parts[0]) if parts else "") or "Unbekannt"
+    first = (real[0] if real else ROLE.sub("", parts[0]) if parts else "") or "Unbekannt"
+    return author_aliases().get(db.norm(first), first) if resolve else first
 
 
 def sync(progress=lambda msg: None) -> str:

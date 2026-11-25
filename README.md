@@ -7,7 +7,7 @@ A self-hosted companion for [Audiobookshelf](https://www.audiobookshelf.org/) �
 
 [![CI](https://github.com/moritzfrey95-beep/audiobook-wizarrd/actions/workflows/ci.yml/badge.svg)](https://github.com/moritzfrey95-beep/audiobook-wizarrd/actions/workflows/ci.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.6.2-8b74ff)
+![Version](https://img.shields.io/badge/version-0.7.0-8b74ff)
 ![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)
 ![Languages](https://img.shields.io/badge/UI-English%20%7C%20Deutsch-555)
 
@@ -26,7 +26,7 @@ week, that the German edition is missing two books, or that a new volume is anno
 
 **AudioBook Wizarrd (ABW)** looks at every series in your library, compares it with everything Audible knows about that series,
 and shows you at a glance what is complete, what is missing and what is coming. If you want, it goes one step further: it searches
-your own indexers through Prowlarr, downloads with SABnzbd or qBittorrent, **checks every download** (runtime, tags, a spoken
+your own indexers through Prowlarr, downloads with SABnzbd, NZBGet, qBittorrent, Transmission, Deluge, Real-Debrid or TorBox, **checks every download** (runtime, tags, a spoken
 intro) and files it neatly into your library – then tells Audiobookshelf to rescan.
 
 Everything runs on your own server. ABW talks only to services you run yourself and to the public Audible catalogue.
@@ -58,7 +58,9 @@ ABW is organised like your day with audiobooks: **Listen**, **Library**, **Disco
 - **Standalone books** grouped per author, **omnibus editions** recognised and not counted as missing volumes
 - **Filters** by language, status, genre, tag and who requested it; **sort** by name, recently added, missing volumes, next release, length
 - **Series page:** every volume with your rating, listened state, EPUB, a manual or automatic search button and per-series automation
-- **Authors:** all authors with books in German and English, and how many more series Audible has from them
+- **Authors:** all authors with books in German and English, and how many more series Audible has from them; **merge authors**
+  Audible lists under several spellings (with suggestions)
+- **Ended series:** mark a series as ended by the author – it shows as such and Audible is only checked monthly; a new volume lifts the mark
 
 ### 🧭 Discover – find your next series
 - **For you:** suggestions built from what you finished and how you rated it – more volumes heard and more stars count more,
@@ -71,8 +73,11 @@ ABW is organised like your day with audiobooks: **Listen**, **Library**, **Disco
 ### 🔔 New – never miss a release
 - **Follow** series and authors with the bell: get notified when a new volume is announced, released, or lands in your library,
   and when an author starts a new series
-- **Notifications** in the app, as **browser push** on your phone, or via [ntfy](https://ntfy.sh)
-- **Release calendar** of upcoming volumes for the series you follow (or all languages)
+- **Notifications** in the app, as **browser push** on your phone, via [ntfy](https://ntfy.sh) or a **webhook** (Discord, Slack, Teams, JSON)
+- **Choose what you get:** every notification type can be switched off per user (e.g. no e-book messages), series can be **muted**
+  without unfollowing, and push can come as a **weekly digest**
+- **Release calendar** of upcoming volumes for the series you follow (or all languages), also as a **calendar subscription** (`.ics`)
+  for Google, Apple or Outlook calendar, filtered by language and by what you follow
 
 ### 📊 Recap – your listening, in numbers
 - **Listening history** from Audiobookshelf's sessions: week, month and year recaps per account or for everyone, compared with the
@@ -85,7 +90,8 @@ ABW is organised like your day with audiobooks: **Listen**, **Library**, **Disco
 
 ### 🔎 Workshop – search, download, check, import (admins)
 - Search via **[Prowlarr](https://prowlarr.com/)** across your Usenet and torrent indexers, with several query variants per volume
-- Download via **SABnzbd** (or anything with its API) and **qBittorrent**, each into its own folder; finished torrents are stopped
+- Download via **SABnzbd** (or anything with its API) or **NZBGet**, and **qBittorrent**, **Transmission**, **Deluge**, **Real-Debrid** or
+  **TorBox**, each into its own folder; finished torrents are stopped
 - **Scoring with reasons:** every result is rated *sure*, *possible* or *rejected* – and ABW tells you why (title, volume number,
   author, narrator, language, size, omnibus, uploaded before release …)
 - **Guided search** for manual control, **automatic search** for the boring part (with back-off: 1, 2, 4, 7 days)
@@ -104,12 +110,14 @@ ABW is organised like your day with audiobooks: **Listen**, **Library**, **Disco
   omnibus files** already in your library at chapter borders, and a nightly **integrity scan** that finds broken files
   (e.g. zero-filled gaps from unfinished torrents) and searches for a replacement
 - **Requested by** tags in Audiobookshelf show which user asked for a book
+- Optional: **write metadata into the files** – Audiobookshelf embeds title, author, narrator, series, cover and chapters, ABW checks the tags
 - **Tasks:** every background job with its schedule, last run and a *run now* button; every automation has its own switch
 
 ### 🧰 Built for self-hosters
 - **One Docker image**, SQLite, no external database; slim by default, with an optional `-whisper` variant
 - **Setup wizard** on first start, every connection editable and **testable in the UI**
 - **Multiple users and roles:** create accounts, or **sign in with your Audiobookshelf account** and import its users
+- **API keys** per user (`X-Api-Key` header) for your own scripts and tools
 - **English and German** interface (per user, follows your browser), light and dark design, installable as an **app** (PWA)
 - **Extensions:** add your own sources as plugins without forking ([details](#-extensions))
 - Automation is **off by default** – nothing is downloaded or moved until you switch it on
@@ -218,9 +226,9 @@ ABW runs as `ABW_UID:ABW_GID` (default `1000:1000`) – make sure that user may 
 |---|---|---|---|
 | **Audiobookshelf** | ✅ | library, users, progress, import target | wizard / `ABS_*` |
 | **Prowlarr** | for searching | Usenet and torrent indexers | wizard / `PROWLARR_*`, `*_INDEXER_IDS` |
-| **SABnzbd** | optional | Usenet downloads | wizard / `SABNZBD_*` |
-| **qBittorrent** | optional | torrent downloads | wizard / `QBIT_*` |
-| **ntfy** | optional | push notifications (browser push works without) | wizard / `NTFY_*` |
+| **SABnzbd** or **NZBGet** | optional | Usenet downloads | wizard / `SABNZBD_*`, `ABW_USENET_CLIENT`, `NZBGET_*` |
+| **qBittorrent**, **Transmission**, **Deluge**, **Real-Debrid** or **TorBox** | optional | torrent downloads | wizard / `QBIT_*`, `ABW_TORRENT_CLIENT`, `DEBRID_API_KEY` |
+| **ntfy** / **webhook** | optional | notifications (browser push works without) | wizard / `NTFY_*`, `ABW_WEBHOOK_URL` |
 | **FlareSolverr** | optional | Goodreads genres, some extensions | wizard / `FLARESOLVERR_URL` |
 
 Secrets can be passed as files (`*_HOST_FILE` in `.env`, mounted read-only) or entered in the UI.
@@ -405,15 +413,18 @@ die Bibliothek.
   Hörspiele, Einzelbücher je Autor, Filter nach Sprache, Status, Genre, Tag und Wunsch, Autorenübersicht
 - **Entdecken:** Vorschläge «Für dich» aus Gehörtem und Bewertungen, Serien deiner Autoren, Audible-Toplisten und freie Suche,
   Goodreads-Regal als Wunschliste
-- **Neu:** Serien und Autoren markieren, Meldungen in der App, als Browser-Push oder über ntfy, Erscheinungskalender
+- **Neu:** Serien und Autoren markieren, Meldungen in der App, als Browser-Push, über ntfy oder einen Webhook (Discord, Slack,
+  Teams), jede Meldungsart einzeln abschaltbar, Serien stummschalten, Push als Wochen-Zusammenfassung, Erscheinungskalender
+  auch als Kalender-Abo (`.ics`) nach Sprache und Markierung gefiltert
 - **Rückblick:** Hörverlauf je Woche, Monat und Jahr (Konten, Geräte, Uhrzeiten, liegengebliebene Bücher), Statistik zum Bestand,
   eigene Bewertungen und Topliste je Tag
-- **Werkstatt:** Suche über Prowlarr, Download über SABnzbd und qBittorrent, Bewertung jedes Treffers mit Begründung,
+- **Werkstatt:** Suche über Prowlarr, Download über SABnzbd oder NZBGet und qBittorrent, Transmission, Deluge, Real-Debrid oder TorBox, Bewertung jedes Treffers mit Begründung,
   Ankunftsprüfung (Laufzeit, Tags, gesprochene Ansage), Sammelbände aufteilen, Ablage mit Audible-Match, bessere Fassungen
   ersetzen schlechtere, Papierkorb statt Löschen, E-Books, MP3 zu M4B, Kapitel von Audible, nächtliche Prüfung auf Schäden,
-  eigene Ordnerstruktur (etwa `Autor/Serie/Book 1 - Titel`) mit Vorschau
+  eigene Ordnerstruktur (etwa `Autor/Serie/Book 1 - Titel`) mit Vorschau, Metadaten in die Dateien schreiben, Autoren mit
+  mehreren Schreibweisen zusammenführen, Serien als «vom Autor beendet» markieren
 - **Für Selbsthoster:** ein Docker-Image, SQLite, Setup-Wizard, alle Verbindungen in der Oberfläche einstell- und prüfbar,
-  Anmeldung auch mit dem Audiobookshelf-Konto, Oberfläche auf Deutsch und Englisch, hell und dunkel, als App installierbar,
+  Anmeldung auch mit dem Audiobookshelf-Konto, API-Schlüssel je Benutzer, Oberfläche auf Deutsch und Englisch, hell und dunkel, als App installierbar,
   Erweiterungen für eigene Quellen. Die Automatik ist nach der Einrichtung aus.
 
 **Schnellstart**

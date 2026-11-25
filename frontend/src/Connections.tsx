@@ -10,7 +10,11 @@ export interface CfgView { fields: Record<string, CfgField>; langs: ('en' | 'de'
 interface TestResult { ok: boolean; text: string; libraries?: { id: string; name: string; folders: string[] }[]; indexers?: Indexer[] }
 interface Indexer { id: number; name: string; protocol: string | null; enabled: boolean }
 
-type Def = { name: string; label: string; hint?: string; type?: 'text' | 'password' | 'checkbox' }
+type Def = { name: string; label: string; hint?: string; type?: 'text' | 'password' | 'checkbox' | 'select'; options?: { value: string; label: string }[]; when?: (v: Record<string, string>) => boolean }
+
+const uc = (v: Record<string, string>) => (v.USENET_CLIENT || 'sabnzbd').toLowerCase()
+const tc = (v: Record<string, string>) => (v.TORRENT_CLIENT || 'qbittorrent').toLowerCase()
+const debrid = (v: Record<string, string>) => ['realdebrid', 'torbox'].includes(tc(v))
 export interface Group { key: string; title: string; text: string; test?: string; fields: Def[]; optional?: boolean }
 
 /** Verbindungen in der Reihenfolge des Wizards. Ordner sind immer Pfade aus Sicht von ABW (im Container). */
@@ -44,31 +48,39 @@ export const GROUPS: Group[] = [
     ],
   },
   {
-    key: 'sabnzbd', title: 'SABnzbd', test: 'sabnzbd', optional: true, text: t('Download aus dem Usenet. Programme mit derselben Schnittstelle gehen auch.'),
+    key: 'sabnzbd', title: t('Usenet-Download'), test: 'sabnzbd', optional: true, text: t('Download aus dem Usenet mit SABnzbd oder NZBGet. Programme mit der Schnittstelle von SABnzbd gehen auch.'),
     fields: [
-      { name: 'SAB_URL', label: t('Adresse'), hint: t('z. B. http://sabnzbd:8080') },
-      { name: 'SABNZBD_API_KEY', label: t('API-Schlüssel'), type: 'password' },
+      { name: 'USENET_CLIENT', label: t('Programm'), type: 'select', options: [{ value: 'sabnzbd', label: 'SABnzbd' }, { value: 'nzbget', label: 'NZBGet' }] },
+      { name: 'SAB_URL', label: t('Adresse'), hint: t('z. B. http://sabnzbd:8080 oder http://nzbget:6789') },
+      { name: 'SABNZBD_API_KEY', label: t('API-Schlüssel'), type: 'password', when: v => uc(v) === 'sabnzbd' },
+      { name: 'NZBGET_USERNAME', label: t('Benutzer'), type: 'password', when: v => uc(v) === 'nzbget' },
+      { name: 'NZBGET_PASSWORD', label: t('Passwort'), type: 'password', when: v => uc(v) === 'nzbget' },
       { name: 'SAB_CATEGORY', label: t('Kategorie') },
       { name: 'USENET_COMPLETE_ROOT', label: t('Ordner der fertigen Downloads'), hint: t('Pfad in ABW') },
     ],
   },
   {
-    key: 'qbit', title: 'qBittorrent', test: 'qbit', optional: true, text: t('Download über Torrent, in einen eigenen Ordner.'),
+    key: 'qbit', title: t('Torrent-Download'), test: 'qbit', optional: true, text: t('Download über Torrent, in einen eigenen Ordner. Bei Real-Debrid und TorBox lädt der Dienst, ABW holt danach die Dateien in den Ordner der fertigen Torrents.'),
     fields: [
-      { name: 'QBIT_URL', label: t('Adresse'), hint: t('z. B. http://qbittorrent:8080') },
-      { name: 'QBIT_USERNAME', label: t('Benutzer'), type: 'password' },
-      { name: 'QBIT_PASSWORD', label: t('Passwort'), type: 'password' },
-      { name: 'QBIT_CATEGORY', label: t('Kategorie') },
-      { name: 'QBIT_SAVE_ROOT', label: t('Speicherordner aus Sicht von qBittorrent') },
-      { name: 'TORRENT_COMPLETE_ROOT', label: t('Derselbe Ordner aus Sicht von ABW') },
+      { name: 'TORRENT_CLIENT', label: t('Programm oder Dienst'), type: 'select', options: [
+        { value: 'qbittorrent', label: 'qBittorrent' }, { value: 'transmission', label: 'Transmission' }, { value: 'deluge', label: 'Deluge' },
+        { value: 'realdebrid', label: 'Real-Debrid' }, { value: 'torbox', label: 'TorBox' }] },
+      { name: 'QBIT_URL', label: t('Adresse'), hint: t('z. B. http://qbittorrent:8080, http://transmission:9091 oder http://deluge:8112'), when: v => !debrid(v) },
+      { name: 'QBIT_USERNAME', label: t('Benutzer'), type: 'password', when: v => ['qbittorrent', 'transmission'].includes(tc(v)) },
+      { name: 'QBIT_PASSWORD', label: t('Passwort'), type: 'password', when: v => !debrid(v) },
+      { name: 'DEBRID_API_KEY', label: t('API-Schlüssel des Dienstes'), type: 'password', when: debrid },
+      { name: 'QBIT_CATEGORY', label: t('Kategorie'), when: v => tc(v) === 'qbittorrent' },
+      { name: 'QBIT_SAVE_ROOT', label: t('Speicherordner aus Sicht des Download-Programms'), when: v => !debrid(v) },
+      { name: 'TORRENT_COMPLETE_ROOT', label: t('Ordner der fertigen Torrents aus Sicht von ABW') },
     ],
   },
   {
-    key: 'notify', title: t('Meldungen'), test: 'notify', optional: true, text: t('Meldungen über ntfy. Push im Browser geht auch ohne.'),
+    key: 'notify', title: t('Meldungen'), test: 'notify', optional: true, text: t('Meldungen über ntfy und/oder einen Webhook (Discord, Slack, Teams oder eigener Empfänger mit JSON). Push im Browser geht auch ohne. Der Test schickt eine Testmeldung an den Webhook.'),
     fields: [
       { name: 'NTFY_URL', label: 'ntfy-Adresse' },
       { name: 'NTFY_TOPIC', label: t('Thema') },
       { name: 'NTFY_TOKEN', label: t('Zugangsschlüssel'), type: 'password' },
+      { name: 'WEBHOOK_URL', label: t('Webhook-Adresse'), type: 'password', hint: t('z. B. https://discord.com/api/webhooks/…') },
       { name: 'PUBLIC_URL', label: t('Adresse von ABW für Links in Meldungen') },
     ],
   },
@@ -126,9 +138,17 @@ function ServiceForm({ group, cfg, onSaved, saveLabel = t('Speichern') }: FormPr
     <div className="rounded-xl border border-line bg-surface p-4">
       <p className="mb-4 text-sm text-muted">{group.text}</p>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {group.fields.map(f => {
+        {group.fields.filter(f => !f.when || f.when(vals)).map(f => {
           const meta = cfg.fields[f.name]
           const id = `cfg-${f.name}`
+          if (f.type === 'select') return (
+            <div key={f.name}>
+              <label htmlFor={id} className="mb-1 block text-sm font-semibold">{f.label}</label>
+              <select id={id} className={input} value={(vals[f.name] || f.options?.[0]?.value) ?? ''} onChange={e => set(f.name, e.target.value)}>
+                {f.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+          )
           if (f.type === 'checkbox') return (
             <label key={f.name} className="flex min-h-10 items-center gap-2 text-sm md:col-span-2">
               <input type="checkbox" checked={['1', 'true', 'ja', 'yes', 'on'].includes((vals[f.name] ?? '').toLowerCase())} onChange={e => set(f.name, e.target.checked ? '1' : '0')} className="h-4 w-4" />

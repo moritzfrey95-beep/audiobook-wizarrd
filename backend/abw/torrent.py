@@ -14,9 +14,19 @@ META_TIMEOUT_MIN = 20     # ohne Metadaten gilt ein Torrent als tot
 STALL_TIMEOUT_H = 12      # so lange ohne Fortschritt, dann aufgeben
 
 
+def client_ready() -> bool:
+    """Ist der gewählte Torrent-Client eingerichtet?"""
+    from . import dlclients
+    kind = dlclients.torrent_client()
+    if kind in ("realdebrid", "torbox"):
+        return bool(config.secret("DEBRID_API_KEY"))
+    if kind == "qbittorrent":
+        return bool(config.QBIT_URL and config.secret("QBIT_USERNAME") and config.QBIT_SAVE_ROOT)
+    return bool(config.QBIT_URL and config.QBIT_SAVE_ROOT)  # Transmission und Deluge gehen auch ohne Benutzer
+
+
 def configured() -> bool:
-    return bool(config.PROWLARR_URL and config.secret("PROWLARR_API_KEY") and config.TORRENT_INDEXER_IDS
-                and config.QBIT_URL and config.secret("QBIT_USERNAME") and config.QBIT_SAVE_ROOT)
+    return bool(config.PROWLARR_URL and config.secret("PROWLARR_API_KEY") and config.TORRENT_INDEXER_IDS and client_ready())
 
 
 def search(queries: list[str]) -> tuple[list[dict], list[str]]:
@@ -186,6 +196,12 @@ class Qbit:
 def submit(guid: str, marker: str, force: bool = False) -> str:
     """force: sofort starten, auch wenn die Warteschlange von qBittorrent voll ist (für kleine E-Books)."""
     item = fetch(guid)
+    from . import dlclients
+    if dlclients.torrent_client() != "qbittorrent":
+        cid = dlclients.torrent().add(item, marker, force)
+        if not cid:
+            raise RuntimeError("Der Torrent-Client hat den Torrent nicht bestätigt")
+        return cid
     h = info_hash(item)
     with Qbit() as q:
         t = q.by_hash(h) if h else None
@@ -208,6 +224,9 @@ def submit(guid: str, marker: str, force: bool = False) -> str:
 
 def status(rows: list[dict]) -> dict[int, dict]:
     """Stand je Download-Zeile. Fertige Torrents werden sofort gestoppt (Entscheid: nicht weiter verteilen)."""
+    from . import dlclients
+    if dlclients.torrent_client() != "qbittorrent":
+        return status_generic(rows, dlclients.torrent())
     out: dict[int, dict] = {}
     now = time.time()
     with Qbit() as q:
@@ -238,8 +257,47 @@ def status(rows: list[dict]) -> dict[int, dict]:
     return out
 
 
+def status_generic(rows: list[dict], client) -> dict[int, dict]:
+    """Wie status(), für Transmission, Deluge und Debrid-Dienste; client_id ist deren Kennung."""
+    out: dict[int, dict] = {}
+    now = time.time()
+    for r in rows:
+        t = client.get(r["client_id"], r["marker"])
+        if not t:
+            out[r["id"]] = {"state": "failed", "error": "Der Torrent ist im Download-Client nicht mehr vorhanden"}
+            continue
+        age_min = (now - t.get("added_on", now)) / 60
+        idle_h = (now - max(t.get("last_activity") or 0, t.get("added_on") or 0)) / 3600
+        if t["state"] == "moving":
+            out[r["id"]] = {"state": "downloading", "progress": t.get("progress", 0)}
+        elif t["state"] == "done":
+            client.stop(r["client_id"])
+            out[r["id"]] = {"state": "arrived", "progress": 1.0}
+        elif t["state"] == "meta" and age_min > META_TIMEOUT_MIN:
+            client.remove(r["client_id"], True)
+            out[r["id"]] = {"state": "failed", "error": f"Tot: nach {META_TIMEOUT_MIN} Minuten keine Quelle gefunden"}
+        elif t["state"] == "error":
+            client.remove(r["client_id"], True)
+            out[r["id"]] = {"state": "failed", "error": t.get("error") or "Der Download-Client meldet einen Fehler"}
+        elif idle_h > STALL_TIMEOUT_H:
+            client.remove(r["client_id"], True)
+            pct = f"{int(t.get('progress', 0) * 1000) / 10:g}"
+            out[r["id"]] = {"state": "failed", "error": f"Abgebrochen: {STALL_TIMEOUT_H} Stunden ohne Fortschritt bei {pct} %"}
+        else:
+            out[r["id"]] = {"state": "downloading" if t.get("progress", 0) > 0 else "queued", "progress": t.get("progress", 0)}
+    return out
+
+
 def forget(marker: str) -> None:
-    """Torrent aus qBittorrent austragen, Dateien bleiben liegen (das Aufräumen verschiebt sie)."""
+    """Torrent aus dem Download-Client austragen, Dateien bleiben liegen (das Aufräumen verschiebt sie)."""
+    from . import db, dlclients
+    if dlclients.torrent_client() != "qbittorrent":
+        c = db.conn()
+        row = c.execute("SELECT client_id FROM download WHERE marker=? AND source='audiobookbay'", (marker,)).fetchone() or \
+            c.execute("SELECT client_id FROM ebook_job WHERE marker=?", (marker,)).fetchone()
+        if row and row["client_id"]:
+            dlclients.torrent().remove(row["client_id"], False)
+        return
     with Qbit() as q:
         t = q.by_tag(marker)
         if t:

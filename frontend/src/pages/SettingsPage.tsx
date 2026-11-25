@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { CheckCircle2, CircleSlash, Download, FileUp, KeyRound, Link2, LogOut, RefreshCw, Save, ShieldCheck, Trash2, Unlink, UserPlus, UserRound } from 'lucide-react'
 import { api, fmtDate, useData } from '../api'
 import { Button, ErrorBox, Page, Section, ask, prompt } from '../ui'
+import { ApiKeys } from '../ApiKeys'
 import { PushPanel } from '../Push'
 import { GROUPS, GroupForm, type CfgView } from '../Connections'
 import { t } from '../i18n'
@@ -431,6 +432,7 @@ export default function SettingsPage() {
       )}
       <Section title={t('Push aufs Handy')}><PushPanel box={box} /></Section>
       <Section title={t('Goodreads verknüpfen')}><GoodreadsPanel key={m.goodreads.user + m.goodreads.shelf} g={m.goodreads} onChange={me.reload} /></Section>
+      <Section title={t('API-Schlüssel')} hint={t('Zugang für Skripte und andere Programme')}><ApiKeys /></Section>
       {admin && error && !data && <div className="mt-8"><ErrorBox message={error} onRetry={reload} /></div>}
       {admin && <ConnectionsSection onChange={reload} />}
       {admin && data && (

@@ -40,19 +40,25 @@ FIELDS: dict[str, Field] = {
     "USENET_INDEXER_IDS": Field("USENET_INDEXER_IDS", "ids", "", "prowlarr"),
     "TORRENT_INDEXER_IDS": Field("TORRENT_INDEXER_IDS", "ids", "", "prowlarr"),
     "EBOOK_TORRENT_INDEXER_IDS": Field("EBOOK_TORRENT_INDEXER_IDS", "ids", "", "prowlarr"),
+    "USENET_CLIENT": Field("ABW_USENET_CLIENT", "str", "sabnzbd", "sabnzbd"),  # sabnzbd oder nzbget
     "SAB_URL": Field("SABNZBD_URL", "url", "", "sabnzbd"),
     "SABNZBD_API_KEY": Field("SABNZBD_API_KEY", "secret", "", "sabnzbd"),
+    "NZBGET_USERNAME": Field("NZBGET_USERNAME", "secret", "", "sabnzbd"),
+    "NZBGET_PASSWORD": Field("NZBGET_PASSWORD", "secret", "", "sabnzbd"),
     "SAB_CATEGORY": Field("SABNZBD_CATEGORY", "str", "audiobooks", "sabnzbd"),
     "USENET_COMPLETE_ROOT": Field("USENET_COMPLETE_ROOT", "path", "/usenet-complete", "sabnzbd"),
+    "TORRENT_CLIENT": Field("ABW_TORRENT_CLIENT", "str", "qbittorrent", "qbit"),  # qbittorrent, transmission, deluge, realdebrid, torbox
     "QBIT_URL": Field("QBIT_URL", "url", "", "qbit"),
     "QBIT_USERNAME": Field("QBIT_USERNAME", "secret", "", "qbit"),
     "QBIT_PASSWORD": Field("QBIT_PASSWORD", "secret", "", "qbit"),
     "QBIT_SAVE_ROOT": Field("QBIT_SAVE_ROOT", "path", "", "qbit"),
     "QBIT_CATEGORY": Field("QBIT_CATEGORY", "str", "abw", "qbit"),
+    "DEBRID_API_KEY": Field("DEBRID_API_KEY", "secret", "", "qbit"),  # Real-Debrid oder TorBox
     "TORRENT_COMPLETE_ROOT": Field("TORRENT_COMPLETE_ROOT", "path", "/torrent-complete", "qbit"),
     "NTFY_URL": Field("NTFY_URL", "url", "", "notify"),
     "NTFY_TOPIC": Field("NTFY_TOPIC", "str", "", "notify"),
     "NTFY_TOKEN": Field("NTFY_TOKEN", "secret", "", "notify"),
+    "WEBHOOK_URL": Field("ABW_WEBHOOK_URL", "secret", "", "notify"),  # Discord, Slack, Teams oder eigener Empfänger (JSON)
     "PUBLIC_URL": Field("ABW_PUBLIC_URL", "url", "", "notify"),
     "FLARESOLVERR_URL": Field("FLARESOLVERR_URL", "url", "", "extra"),  # optional: Goodreads und Erweiterungen
     "AUDIBLE_DELAY": Field("AUDIBLE_DELAY", "float", "0.35", "extra"),

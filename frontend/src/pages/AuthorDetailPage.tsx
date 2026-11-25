@@ -5,12 +5,13 @@ import { SeriesCard } from '../SeriesCard'
 import { Cover, ErrorBox, GRID, LangTag, Page, Section } from '../ui'
 import { WatchButton } from '../Watch'
 import { FollowButton } from '../Follow'
-import { useLangs } from '../session'
+import { useAdmin, useLangs } from '../session'
+import { AuthorAliases } from '../AuthorMerge'
 import { t } from '../i18n'
 
 interface Cat { lang: string; series_asin: string; series_title: string; book_count: number; cover_url: string | null; series_id: number | null; watched: boolean }
 interface Detail {
-  key: string; name: string; series: Series[]; catalog: Cat[]; catalog_fetched: string | null
+  key: string; name: string; series: Series[]; catalog: Cat[]; catalog_fetched: string | null; aliases?: { key: string; name: string }[]
   singles: { id: number; title: string; lang: string; cover: string | null; finished: boolean; progress: number | null; owned: boolean }[]
 }
 
@@ -18,6 +19,7 @@ export default function AuthorDetailPage() {
   const { key } = useParams()
   const { data: a, error, reload } = useData<Detail>(`/authors/${key}`)
   const langs = useLangs()
+  const admin = useAdmin()
   if (error && !a) return <Page title={t('Autor')}><ErrorBox message={error} onRetry={reload} /></Page>
   if (!a) return <Page title={t('Autor wird geladen')}><div className="skeleton h-40 rounded-2xl" /></Page>
   const more = a.catalog.filter(c => !c.series_id)
@@ -60,6 +62,11 @@ export default function AuthorDetailPage() {
               </li>
             ))}
           </ul>
+        </Section>
+      )}
+      {admin && (
+        <Section title={t('Schreibweisen')} hint={t('Denselben Autor unter einem Namen führen')}>
+          <AuthorAliases authorKey={a.key} name={a.name} aliases={a.aliases ?? []} onChange={reload} />
         </Section>
       )}
     </Page>

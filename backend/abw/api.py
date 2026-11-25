@@ -14,10 +14,10 @@ from pydantic import BaseModel
 
 from . import __version__
 from . import abs as abs_mod
-from . import activity, audible, auth, chapters, cleanup, config, convert, db, ebook, folders, foryou, i18n, importer, integrity, libsplit, library, librarytags, listened, listening, notifications, notify, plugins, push, ratings, search, setup, tasks, titles, toread, torrent, usenet, variants, verify, wishlist
+from . import activity, audible, auth, authors as authors_mod, chapters, cleanup, config, convert, db, ebook, folders, foryou, i18n, icsfeed, importer, integrity, libsplit, library, librarytags, listened, listening, notifications, notify, plugins, push, ratings, search, setup, tasks, titles, toread, torrent, usenet, variants, verify, wishlist
 
 app = FastAPI(title="AudioBook Wizarrd", version=__version__)
-PRIORITY = ["downloading", "review", "failed", "searching", "incomplete", "upcoming", "complete", "unknown", "single", "absent", "unmonitored"]
+PRIORITY = ["downloading", "review", "failed", "searching", "incomplete", "upcoming", "ended", "complete", "unknown", "single", "absent", "unmonitored"]
 
 
 @app.on_event("startup")
@@ -93,6 +93,7 @@ def load(user_id: int | None = None) -> dict:
     have_twin = {r["id"] for r in c.execute(db.HAVE_TWIN)}
     auto = auto_on()
     series_auto = {r["id"]: r["auto"] != 0 for r in c.execute("SELECT id, auto FROM series")}
+    series_ended = {r["id"] for r in c.execute("SELECT id FROM series WHERE ended IS NOT NULL")}
     stars_all, stars_mine = defaultdict(list), defaultdict(list)  # Bewertungen
     for r in c.execute("SELECT book_id, user_id, stars FROM rating WHERE stars IS NOT NULL"):
         stars_all[r["book_id"]].append(r["stars"])
@@ -150,6 +151,8 @@ def load(user_id: int | None = None) -> dict:
         flags = set().union(*[e["flags"] for e in mon]) if mon else {"unmonitored"}
         if "complete" in flags and not all("complete" in e["flags"] for e in mon):
             flags.discard("complete")
+        if s["id"] in series_ended and "complete" in flags:
+            flags.add("ended")  # vollständig und vom Autor beendet: kommt nichts mehr
         allb = [b for e in eds for b in e["_books"]]
         owned_books = [b for b in allb if b["owned"]]
         first = next((b for e in sorted(eds, key=lambda e: -e["owned"]) for b in e["_books"] if b["owned"]), None) or (allb[0] if allb else None)
@@ -167,7 +170,7 @@ def load(user_id: int | None = None) -> dict:
             "hours": round(_mean_editions(eds) / 60),
             "hours_editions": sum(1 for e in eds if any(b["owned"] and b["runtime_min"] for b in e["_books"])),
             "listened": sum(1 for b in owned_books if prog.get(b["id"], (0, False))[1]), "owned": len(owned_books),
-            "auto": series_auto.get(s["id"], True),
+            "auto": series_auto.get(s["id"], True), "ended": s["id"] in series_ended,
             "rating": ratings.summary([x for b in allb for x in stars_all.get(b["id"], [])], [x for b in allb for x in stars_mine.get(b["id"], [])]),
             "editions": eds,
         }
@@ -400,10 +403,10 @@ def external(request: Request) -> bool:
 
 # Benutzer mit der Rolle «user» dürfen ansehen, hinzufügen, markieren, die automatische Suche für Serien und Bücher
 # anstossen und ihr Goodreads-Regal verknüpfen. Alles andere (Prüfen, Aufgaben, Schalter, Auswahl von Hand) ist dem Administrator vorbehalten.
-USER_READ = re.compile(r"^/api/(series(/\d+(/autosearch)?)?|authors(/[^/]+)?|discover/.+|watchlist|calendar|stats|listening|cover/.+|notifications|follows(/overview)?|me|push|listened"
+USER_READ = re.compile(r"^/api/(series(/\d+(/autosearch)?)?|authors(/[^/]+)?|discover/.+|watchlist|calendar(/feed)?|stats|listening|cover/.+|notifications(/prefs)?|follows(/overview)?|me|me/apikeys|push|listened"
                        r"|books/\d+/autosearch|ratings/(count|open|mine|tags|stats)|toread(/keys|/asins|/heard|/users|/picks)?)$")
-USER_WRITE = re.compile(r"^/api/(series/\d+/autosearch|books/\d+/autosearch|watchlist(/[^/]+)?|follow|notifications/(read|clear)|push/(subscribe|unsubscribe|test)"
-                        r"|me/goodreads(/csv|/sync)?|me/prefs|books/\d+/listened|ratings/(book|edition)/\d+|toread(/order|/discover|/picks/decide|/recommend|/rec/[eb]\d+|/suggest/\d+|/(book|edition)/\d+)?)$")
+USER_WRITE = re.compile(r"^/api/(series/\d+/autosearch|books/\d+/autosearch|watchlist(/[^/]+)?|follow(/mute)?|notifications/(read|clear|prefs)|push/(subscribe|unsubscribe|test)"
+                        r"|me/goodreads(/csv|/sync)?|me/prefs|me/apikeys(/\d+)?|calendar/feed|books/\d+/listened|ratings/(book|edition)/\d+|toread(/order|/discover|/picks/decide|/recommend|/rec/[eb]\d+|/suggest/\d+|/(book|edition)/\d+)?)$")
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -437,11 +440,29 @@ async def guard(request: Request, call_next):
     path = request.url.path
     request.state.user = dict(auth.OPEN_USER)
     i18n.lang.set(i18n.pick(request.headers.get("x-abw-lang")))
+    if path == "/api/calendar.ics":
+        # Kalender-Apps schicken kein Cookie: der Schlüssel im Link gilt nur für diese eine Adresse
+        user = auth.token_user(request.query_params.get("token"), "ics")
+        if not user:
+            return JSONResponse({"detail": i18n.tr("Kalender-Link ungültig oder erneuert.")}, status_code=401)
+        request.state.user = user
+        return await call_next(request)
     if path.startswith("/api/"):
         on = auth.enabled()
         # Ohne Passwort ist ABW nur direkt im Heimnetz offen. Von aussen geht dann gar nichts, auch nicht das Festlegen des Passworts.
         if not on and external(request):
             return JSONResponse({"detail": i18n.tr(NO_PASSWORD)}, status_code=403)
+        api_key = request.headers.get("x-api-key") or (request.headers.get("authorization", "")[7:]
+                                                        if request.headers.get("authorization", "").lower().startswith("bearer abw_") else "")
+        if api_key:
+            # API-Schlüssel: dieselben Rechte wie der Benutzer, auch wenn ABW ohne Passwort läuft
+            user = auth.token_user(api_key, "api")
+            if not user:
+                return JSONResponse({"detail": i18n.tr("API-Schlüssel ungültig.")}, status_code=401)
+            request.state.user = user
+            if user["role"] != "admin" and not (USER_READ if request.method in ("GET", "HEAD") else USER_WRITE).match(path):
+                return JSONResponse({"detail": i18n.tr("Das darf nur ein Administrator.")}, status_code=403)
+            return await call_next(request)
         if on:
             user = auth.session_user(request.cookies.get(auth.COOKIE))
             request.state.user = user
@@ -766,7 +787,8 @@ def follow_overview(request: Request):
     c = db.conn()
     f = notifications.follows(me(request)["id"])
     data = load()
-    series = [{"id": s["id"], "name": s["name"], "author": s["author"], "author_key": s["author_key"], "cover": s["cover"]}
+    mutes = set(notifications.muted(me(request)["id"]))
+    series = [{"id": s["id"], "name": s["name"], "author": s["author"], "author_key": s["author_key"], "cover": s["cover"], "muted": s["id"] in mutes}
               for s in (data.get(sid) for sid in f["series"]) if s]
     want = set(f["authors"])
     names: dict[str, str] = {}
@@ -791,6 +813,39 @@ def follow_set(body: Follow, request: Request):
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     return {"ok": True}
+
+
+class Mute(BaseModel):
+    series_id: int
+    on: bool = True
+
+
+@app.post("/api/follow/mute")
+def follow_mute(body: Mute, request: Request):
+    notifications.mute(me(request)["id"], body.series_id, body.on)
+    return {"ok": True}
+
+
+@app.get("/api/notifications/prefs")
+def notification_prefs(request: Request):
+    out = notifications.prefs(me(request)["id"])
+    for k in out["kinds"]:
+        k["label"] = i18n.tr(k["label"])
+    return out
+
+
+class NotePrefs(BaseModel):
+    kinds: dict[str, bool] | None = None
+    digest: bool | None = None
+
+
+@app.post("/api/notifications/prefs")
+def notification_prefs_set(body: NotePrefs, request: Request):
+    try:
+        notifications.set_prefs(me(request)["id"], body.kinds, body.digest)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return notification_prefs(request)
 
 
 @app.get("/api/notifications")
@@ -948,9 +1003,9 @@ def config_test(body: ConfigTest):
     tests = {
         "abs": lambda: setup.audiobookshelf(v("ABS_URL"), v("ABS_API_KEY")),
         "prowlarr": lambda: setup.prowlarr(v("PROWLARR_URL"), v("PROWLARR_API_KEY")),
-        "sabnzbd": lambda: setup.sabnzbd(v("SAB_URL"), v("SABNZBD_API_KEY")),
-        "qbit": lambda: setup.qbittorrent(v("QBIT_URL"), v("QBIT_USERNAME"), v("QBIT_PASSWORD")),
-        "notify": lambda: setup.ntfy(v("NTFY_URL")),
+        "sabnzbd": lambda: setup.usenet(v("USENET_CLIENT"), v("SAB_URL"), v("SABNZBD_API_KEY"), v("NZBGET_USERNAME"), v("NZBGET_PASSWORD")),
+        "qbit": lambda: setup.torrent(v("TORRENT_CLIENT"), v("QBIT_URL"), v("QBIT_USERNAME"), v("QBIT_PASSWORD"), v("DEBRID_API_KEY")),
+        "notify": lambda: setup.notify(v("NTFY_URL"), v("WEBHOOK_URL")),
         "extra": lambda: setup.flaresolverr(v("FLARESOLVERR_URL")),
     }
     if body.service.startswith("path:"):
@@ -965,6 +1020,9 @@ def config_test(body: ConfigTest):
     return {**r, "text": i18n.tr(r["text"])}
 
 
+TORRENT_NAMES = {"qbittorrent": "qBittorrent", "transmission": "Transmission", "deluge": "Deluge", "realdebrid": "Real-Debrid", "torbox": "TorBox"}
+
+
 @app.get("/api/settings")
 def settings():
     src = lambda name, ok, hint: {"name": name, "ok": bool(ok), "hint": hint}
@@ -973,12 +1031,13 @@ def settings():
         "sources": [
             src("Audiobookshelf", config.abs_token(), "Bestand, Nutzer, Hörfortschritt, Cover"),
             src("Usenet (Prowlarr)", usenet.configured(), "Suche nach Hörbüchern und E-Books"),
-            src("SABnzbd", usenet.sab_configured(), "Download aus dem Usenet"),
-            src("AudioBookBay (qBittorrent)", torrent.configured(), "Torrent-Suche und Download"),
+            src("NZBGet" if config.USENET_CLIENT == "nzbget" else "SABnzbd", usenet.sab_configured(), "Download aus dem Usenet"),
+            src(f"AudioBookBay ({TORRENT_NAMES.get(config.TORRENT_CLIENT, 'qBittorrent')})", torrent.configured(), "Torrent-Suche und Download"),
             src("EBookBay, Internet Archive", ebook.torrent_ready(), "E-Books als Torrent"),
             *[src(*d) for s in plugins.sources() for d in (s.diagnose() if hasattr(s, "diagnose") else [(s.name, s.configured(), "Erweiterung")])],
             *[src("Erweiterung", False, e) for e in plugins.errors],
             src("ntfy", notify.configured() and config.secret("NTFY_TOKEN"), "Meldungen aufs Handy" if notify.configured() and config.secret("NTFY_TOKEN") else "Adresse, Thema oder Schlüssel fehlt"),
+            src("Webhook", notify.webhook_configured(), "Meldungen an Discord, Slack, Teams oder eigenen Empfänger" if notify.webhook_configured() else "Keine Webhook-Adresse"),
             src("Ablage in die Bibliothek", config.IMPORT_ENABLED, "ABW darf Bücher in die Bibliothek legen"),
         ],
     }
@@ -1182,6 +1241,20 @@ def series_auto_set(sid: int, body: SeriesAuto):
     return {"ok": True}
 
 
+class SeriesEnded(BaseModel):
+    ended: bool
+
+
+@app.post("/api/series/{sid}/ended")
+def series_ended_set(sid: int, body: SeriesEnded):
+    """Serie vom Autor beendet: Audible wird für sie nur noch monatlich geprüft. Kündigt Audible doch einen neuen Band an,
+    hebt der Abgleich die Markierung von selbst wieder auf."""
+    stamp = datetime.now(timezone.utc).isoformat(timespec="seconds") if body.ended else None
+    if not db.conn().execute("UPDATE series SET ended=? WHERE id=?", (stamp, sid)).rowcount:
+        raise HTTPException(404, "Serie nicht gefunden")
+    return {"ok": True}
+
+
 @app.get("/api/automation")
 def automation():
     return search.auto_overview()
@@ -1200,6 +1273,7 @@ class Automation(BaseModel):
     notify_ebook: bool | None = None
     auto_author_series: bool | None = None
     auto_integrity: bool | None = None
+    auto_embed: bool | None = None
 
 
 @app.post("/api/automation")
@@ -1210,7 +1284,7 @@ def automation_set(body: Automation):
             tasks.request("auto")
     if body.auto_import is not None:
         db.set_setting("auto_import", "1" if body.auto_import else "0")
-    for key in ("auto_cleanup", "auto_convert", "auto_chapters", "notify", "auto_ebook", "auto_ebook_upcoming", "auto_ebook_listening", "notify_ebook", "auto_author_series", "auto_integrity"):
+    for key in ("auto_cleanup", "auto_convert", "auto_chapters", "notify", "auto_ebook", "auto_ebook_upcoming", "auto_ebook_listening", "notify_ebook", "auto_author_series", "auto_integrity", "auto_embed"):
         if getattr(body, key) is not None:
             db.set_setting(key, "1" if getattr(body, key) else "0")
     if body.auto_author_series:
@@ -1307,10 +1381,10 @@ def convert_purge():
 
 @app.post("/api/notify/test")
 def notify_test():
-    if not notify.configured():
-        raise HTTPException(409, "ntfy ist nicht eingerichtet (Adresse und Thema fehlen)")
+    if not notify.any_configured():
+        raise HTTPException(409, "Weder ntfy noch Webhook ist eingerichtet")
     if not notify.send("AudioBook Wizarrd", "Testmeldung: Die Benachrichtigungen funktionieren.", "/", "mage", force=True):
-        raise HTTPException(502, "ntfy hat die Meldung nicht angenommen. Stimmen Thema und Token?")
+        raise HTTPException(502, "Die Meldung wurde nicht angenommen. Stimmen Thema, Token oder Webhook-Adresse?")
     return {"ok": True}
 
 
@@ -1380,6 +1454,37 @@ def authors():
     return sorted(res, key=lambda a: -(a["en"] + a["de"]))
 
 
+@app.get("/api/authors/duplicates")
+def author_duplicates():
+    return authors_mod.suggestions()
+
+
+class AuthorMerge(BaseModel):
+    into: str  # Schlüssel des Autors, unter dem künftig geführt wird
+
+
+@app.post("/api/authors/{key}/merge")
+def author_merge(key: str, body: AuthorMerge):
+    alias_name, target = authors_mod.raw_name(key), authors_mod.raw_name(body.into)
+    if not alias_name or not target:
+        raise HTTPException(404, "Autor nicht gefunden")
+    target = abs_mod.primary_author(target)  # Ziel ist selbst zusammengeführt: auf dessen Namen
+    try:
+        authors_mod.merge(key, alias_name, target)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    tasks.request("authors")
+    return {"key": db.norm(target), "name": target}
+
+
+@app.delete("/api/authors/alias/{alias_key}")
+def author_split(alias_key: str):
+    if not authors_mod.split(alias_key):
+        raise HTTPException(404, "Keine zusammengeführte Schreibweise")
+    tasks.request("authors")
+    return {"ok": True}
+
+
 @app.get("/api/authors/{key}")
 def author_detail(key: str, request: Request):
     c = db.conn()
@@ -1402,7 +1507,8 @@ def author_detail(key: str, request: Request):
                                                 if db.norm(abs_mod.primary_author(r["author"])) == key), key)
     fetched = c.execute("SELECT MIN(fetched_at) f FROM author_fetch WHERE author_norm=?", (key,)).fetchone()["f"]
     return {"key": key, "name": name, "series": sorted(mine, key=lambda s: -s["owned"]), "catalog": catalog,
-            "singles": singles, "catalog_fetched": fetched}
+            "singles": singles, "catalog_fetched": fetched,
+            "aliases": [{"key": db.norm(n), "name": n} for n in authors_mod.names_of(key)]}
 
 
 # ---------- Entdecken, Merkliste, Kalender ----------
@@ -1744,6 +1850,49 @@ def toread_discover(body: Watch, request: Request):
         return toread.from_discover(me(request)["id"], body.model_dump())
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+
+
+@app.get("/api/calendar.ics")
+def calendar_ics(request: Request, lang: str = "all", scope: str = "followed"):
+    try:
+        entries = icsfeed.select(calendar(), me(request)["id"], lang, scope)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    ui = i18n.pick(request.query_params.get("ui"))
+    return Response(icsfeed.build(entries, "AudioBook Wizarrd", ui), media_type="text/calendar; charset=utf-8",
+                    headers={"Content-Disposition": 'inline; filename="audiobook-wizarrd.ics"', "Cache-Control": "no-store"})
+
+
+@app.get("/api/calendar/feed")
+def calendar_feed(request: Request):
+    """Schlüssel für das Kalender-Abo; die Oberfläche baut daraus den Link."""
+    return {"token": auth.feed_token(me(request)["id"])}
+
+
+@app.post("/api/calendar/feed")
+def calendar_feed_renew(request: Request):
+    return {"token": auth.feed_token(me(request)["id"], renew=True)}
+
+
+@app.get("/api/me/apikeys")
+def apikey_list(request: Request):
+    return auth.api_keys(me(request)["id"])
+
+
+class ApiKeyNew(BaseModel):
+    name: str = ""
+
+
+@app.post("/api/me/apikeys")
+def apikey_create(body: ApiKeyNew, request: Request):
+    return {"key": auth.create_api_key(me(request)["id"], body.name), "keys": auth.api_keys(me(request)["id"])}
+
+
+@app.delete("/api/me/apikeys/{key_id}")
+def apikey_delete(key_id: int, request: Request):
+    if not auth.delete_api_key(me(request)["id"], key_id):
+        raise HTTPException(404, "Schlüssel nicht gefunden")
+    return auth.api_keys(me(request)["id"])
 
 
 @app.get("/api/calendar")

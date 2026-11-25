@@ -410,6 +410,11 @@ export default function SeriesDetailPage() {
         <Switch on={s.auto} label={t('Automatik für diese Serie')}
           onChange={async v => { await api(`/series/${s.id}/auto`, { method: 'POST', body: JSON.stringify({ auto: v }) }); reload() }}
           hint={t('Ist die automatische Suche unter Aufgaben eingeschaltet, sucht und lädt ABW fehlende Bände dieser Serie selbständig. Hier lässt sich das für diese eine Serie abschalten.')} />
+        <div className="mt-3 border-t border-line pt-3">
+          <Switch on={!!s.ended} label={t('Serie ist vom Autor beendet')}
+            onChange={async v => { await api(`/series/${s.id}/ended`, { method: 'POST', body: JSON.stringify({ ended: v }) }); reload() }}
+            hint={t('Audible sagt nicht, ob eine Serie fertig ist. Beendete Serien prüft ABW nur noch monatlich auf neue Bände; kündigt Audible doch einen an, wird die Markierung von selbst aufgehoben.')} />
+        </div>
       </div>}
       {autoOpen && auto.data && <AutoPanel state={auto.data} onClose={() => setAutoOpen(false)} onPick={setSearchBook} canPick={admin} />}
       {admin && searchBook !== null && open.length > 0 && (

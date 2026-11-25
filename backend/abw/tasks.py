@@ -5,7 +5,7 @@ import traceback
 from datetime import datetime, timedelta, timezone
 
 from . import abs as abs_mod
-from . import audible, chapters, cleanup, convert, db, ebook, goodreads, integrity, libsplit, library, librarytags, listened, listening, notifications, search, wishlist
+from . import audible, chapters, cleanup, convert, db, ebook, embed, goodreads, integrity, libsplit, library, librarytags, listened, listening, notifications, search, wishlist
 
 # key -> (Name, Beschreibung, Intervall in Minuten, Funktion)
 TASKS = {
@@ -18,6 +18,7 @@ TASKS = {
     "abs_sessions": ("Audiobookshelf-Sitzungen erneuern", "Erneuert die Sitzungen, mit denen ABW für andere Benutzer «als gehört markieren» nach Audiobookshelf überträgt. Ohne Erneuerung verfallen sie nach 30 Tagen.", 1440, listened.keep_alive),
     "convert": ("MP3 zu M4B umwandeln", "Fasst ein Buch aus vielen Dateien zu einer M4B mit Kapiteln zusammen, prüft sie und legt die Originale in den Papierkorb. Ein Buch pro Lauf, nur bei eingeschaltetem Schalter.", 10, convert.auto),
     "chapters": ("Kapitel ergänzen", "Setzt bei Büchern aus einer Datei ohne Kapitel die Kapitel von Audible, wenn die Laufzeit passt. Nur bei eingeschaltetem Schalter.", 60, chapters.auto),
+    "embed": ("Metadaten in Dateien schreiben", "Lässt Audiobookshelf Titel, Autor, Sprecher, Serie, Beschreibung, Cover und Kapitel in die Audiodateien der von ABW abgelegten und gematchten Bücher einbetten, liest sie danach neu ein und vergleicht die Tags. Höchstens drei Bücher gleichzeitig. Nur bei eingeschaltetem Schalter.", 5, embed.auto),
     "libsplit": ("Sammelbände im Bestand aufteilen", "Schneidet Sammelbände aus einer Datei (Publisher's Pack, «Books 1-3») an den Kapitelgrenzen in Einzelbände, wenn Kapiteltitel oder Audible-Laufzeiten die Grenzen sicher zeigen. Die Bände laufen durch Prüfung und Ablage; sind alle abgelegt, geht der Sammelband in den Papierkorb. Höchstens drei pro Lauf.", 60, libsplit.auto),
     "integrity": ("Bestand auf Schäden prüfen", "Liest nachts (01–07 Uhr) jede Hörbuchdatei im Bestand einmal ganz und sucht Lücken aus Null-Bytes, wie sie unfertige Torrents hinterlassen. Beschädigte Bücher werden neu gesucht; die neue Fassung ersetzt sie nach der Ankunftsprüfung. Unveränderte Bücher werden nicht noch einmal gelesen. Nur bei eingeschaltetem Schalter.", 10, integrity.auto),
     "downloads": ("Downloads verfolgen", "Fragt den Stand der von ABW gestarteten Downloads in SABnzbd, qBittorrent und den Download-Clients der Erweiterungen ab; fertige Torrents werden sofort gestoppt.", 1, search.track),
@@ -29,7 +30,7 @@ TASKS = {
     "ebook_auto": ("E-Books suchen (Automatik)", "Sucht das EPUB zu neu abgelegten Hörbüchern und vorab zu angekündigten Bänden, deren Hörbuch noch nicht erschienen ist (Usenet, sonst EBookBay und Internet Archive), je drei Bücher pro Lauf. Jeder Teil hat seinen Schalter.", 30, ebook.auto),
     "added": ("Hinzugefügtes aufnehmen", "Nimmt Serien und Bücher, die unter Entdecken oder über Goodreads hinzugefügt wurden, als fehlend in die Bibliothek auf, falls das beim Hinzufügen nicht gelang.", 10, library.pending),
     "author_series": ("Serien gehörter Autoren aufnehmen", "Hat irgendein Benutzer ein Buch fertig gehört, kommen alle Serien dieses Autors aus dem Autorenkatalog auf Deutsch und Englisch als fehlend in die Bibliothek; Sprachfassungen derselben Serie kommen auf eine Karte, wo das eindeutig ist. Gekürzte Fassungen nicht. Jede Serie nur einmal: Wird sie wieder entfernt, bleibt sie weg. Nur bei eingeschaltetem Schalter.", 60, library.finished_authors),
-    "notify": ("Benachrichtigungen", "Meldet erschienene Hörbücher markierter Serien und Autoren und räumt Meldungen weg, die älter als ein halbes Jahr sind.", 60, notifications.released),
+    "notify": ("Benachrichtigungen", "Meldet erschienene Hörbücher markierter Serien und Autoren, schickt die Wochen-Zusammenfassungen per Push und räumt Meldungen weg, die älter als ein halbes Jahr sind.", 60, notifications.released),
     "series": ("Serien bei Audible prüfen", "Holt alle Bände und Erscheinungstermine je Serie; findet fehlende und angekündigte Bände.", 360, audible.sync_series),
     "wishlist": ("Wunschliste abgleichen", "Liest die 100 neuesten Bücher der verknüpften Goodreads-Regale (und eingelesene Exporte), sucht sie bei Audible und nimmt Treffer als fehlend in die Bibliothek auf; die Suche läuft dann mit Vorrang.", 720, wishlist.sync),
     "goodreads": ("Goodreads-Genres holen", "Holt über FlareSolverr die Leser-Genres von Goodreads (LitRPG, Cozy, Epic Fantasy …) für gehörte Bücher und die besten Vorschläge unter «Für dich», höchstens 40 Bücher pro Lauf. Ergänzt die Tags aus Audible; einen Monat zwischengespeichert.", 60, goodreads.sync),
@@ -121,7 +122,7 @@ def overview() -> dict:
     runs, seen = [], set()
     for r in c.execute("SELECT * FROM task_run ORDER BY id DESC LIMIT 400"):
         # Häufige Routineläufe nur einmal zeigen, Fehler immer
-        if r["status"] == "ok" and r["key"] in ("abs", "listening", "sessions", "ebooks", "ebook_dl", "ebook_auto", "downloads", "verify", "auto", "cleanup", "convert", "chapters", "libsplit", "integrity", "wishlist", "added", "author_series", "notify", "goodreads") and r["key"] in seen:
+        if r["status"] == "ok" and r["key"] in ("abs", "listening", "sessions", "ebooks", "ebook_dl", "ebook_auto", "downloads", "verify", "auto", "cleanup", "convert", "chapters", "embed", "libsplit", "integrity", "wishlist", "added", "author_series", "notify", "goodreads") and r["key"] in seen:
             continue
         seen.add(r["key"])
         runs.append(dict(r))

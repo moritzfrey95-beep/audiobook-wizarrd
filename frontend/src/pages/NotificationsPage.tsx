@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BellOff, BellRing, CheckCheck, Search, Trash2 } from 'lucide-react'
+import { BellOff, BellRing, CheckCheck, Search, Trash2, Volume2, VolumeX } from 'lucide-react'
 import { api, useData } from '../api'
 import { Button, Chip, Cover, Empty, ErrorBox, Page } from '../ui'
 import { NoteRow, type Notes } from '../Notifications'
+import { Switch } from '../Automation'
 import { t } from '../i18n'
 
 interface Follows { series: number[]; authors: string[] }
 interface Overview {
-  series: { id: number; name: string; author: string; author_key: string; cover: string | null }[]
+  series: { id: number; name: string; author: string; author_key: string; cover: string | null; muted?: boolean }[]
   authors: { key: string; name: string; series: number }[]
 }
 
@@ -19,6 +20,16 @@ function Marked({ onChange }: { onChange: () => void }) {
   const [off, setOff] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState<string | null>(null)
   const [q, setQ] = useState('')
+  const [mutes, setMutes] = useState<Record<number, boolean>>({})
+  const isMuted = (s: { id: number; muted?: boolean }) => mutes[s.id] ?? !!s.muted
+  const mute = async (s: { id: number; muted?: boolean }) => {
+    const on = !isMuted(s)
+    setBusy(`mute:${s.id}`)
+    try {
+      await api('/follow/mute', { method: 'POST', body: JSON.stringify({ series_id: s.id, on }) })
+      setMutes(m => ({ ...m, [s.id]: on }))
+    } finally { setBusy(null) }
+  }
   const toggle = async (kind: 'series' | 'author', key: string) => {
     const id = `${kind}:${key}`
     setBusy(id)
@@ -65,7 +76,14 @@ function Marked({ onChange }: { onChange: () => void }) {
                 <div className="min-w-0 flex-1">
                   <Link to={`/serie/${s.id}`} className="block truncate font-medium hover:underline">{s.name}</Link>
                   <Link to={`/autor/${s.author_key}`} className="block truncate text-sm text-muted hover:underline">{s.author}</Link>
+                  {isMuted(s) && <span className="block text-xs text-faint">{t('Stumm: bleibt markiert und im Kalender, meldet aber nichts')}</span>}
                 </div>
+                {!off.has(`series:${s.id}`) && (
+                  <Button onClick={() => mute(s)} disabled={busy === `mute:${s.id}`}
+                    title={isMuted(s) ? t('Meldungen zu dieser Serie wieder einschalten') : t('Serie stummschalten: bleibt markiert, meldet aber nichts')}>
+                    {isMuted(s) ? <><Volume2 size={15} aria-hidden />{t('Laut')}</> : <><VolumeX size={15} aria-hidden />{t('Stumm')}</>}
+                  </Button>
+                )}
                 {btn('series', String(s.id), t('dieser Serie'))}
               </li>
             ))}
@@ -92,8 +110,55 @@ function Marked({ onChange }: { onChange: () => void }) {
   )
 }
 
+interface Prefs { kinds: { kind: string; label: string; on: boolean }[]; digest: boolean; muted: number[] }
+
+const KIND_HINT: Record<string, string> = {
+  announced: t('Audible nennt einen neuen Band einer markierten Serie.'),
+  new_book: t('Ein neuer Band ist bei Audible schon erschienen, als ABW ihn zum ersten Mal sah.'),
+  released: t('Der Erscheinungstag eines angekündigten Bandes ist da; ABW sucht ihn jetzt.'),
+  available: t('Ein Buch ist in der Bibliothek angekommen.'),
+  new_series: t('Ein markierter Autor hat eine neue Serie.'),
+  epub: t('ABW hat ein E-Book neben ein Hörbuch gelegt.'),
+  recommend: t('Ein anderer Benutzer empfiehlt dir eine Serie.'),
+  rate: t('Nach dem Hören: Erinnerung, das Buch zu bewerten.'),
+}
+
+/** Welche Meldungen der Benutzer bekommt, einzeln abschaltbar, und Push einzeln oder als Wochen-Zusammenfassung. */
+function Settings() {
+  const { data, error, reload } = useData<Prefs>('/notifications/prefs')
+  const [state, setState] = useState<Prefs | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const p = state ?? data
+  const save = async (body: { kinds?: Record<string, boolean>; digest?: boolean }) => {
+    setErr(null)
+    try { setState(await api<Prefs>('/notifications/prefs', { method: 'POST', body: JSON.stringify(body) })) } catch (e) { setErr((e as Error).message) }
+  }
+  if (error && !p) return <ErrorBox message={error} onRetry={reload} />
+  if (!p) return <div className="skeleton h-64 rounded-2xl" />
+  return (
+    <div className="max-w-2xl space-y-8">
+      {err && <ErrorBox message={err} plain />}
+      <section>
+        <h2 className="mb-1 text-sm font-semibold text-muted">{t('Was du bekommst')}</h2>
+        <p className="mb-3 text-sm text-faint">{t('Gilt für die Glocke und für Push. Ausgeschaltete Arten kommen gar nicht mehr.')}</p>
+        <div className="space-y-3 rounded-xl border border-line bg-surface p-4">
+          {p.kinds.map(k => <Switch key={k.kind} on={k.on} onChange={v => save({ kinds: { [k.kind]: v } })} label={k.label} hint={KIND_HINT[k.kind] ?? ''} />)}
+        </div>
+      </section>
+      <section>
+        <h2 className="mb-3 text-sm font-semibold text-muted">{t('Push aufs Handy')}</h2>
+        <div className="rounded-xl border border-line bg-surface p-4">
+          <Switch on={p.digest} onChange={v => save({ digest: v })} label={t('Wochen-Zusammenfassung statt einzeln')}
+            hint={t('Push kommt einmal pro Woche als eine Meldung mit allem Neuen. In der Glocke steht weiter alles sofort.')} />
+        </div>
+      </section>
+      <p className="text-sm text-faint">{t('Einzelne Serien schaltest du unter «Markiert» stumm: Sie bleiben markiert und im Kalender, melden aber nichts.')}</p>
+    </div>
+  )
+}
+
 export default function NotificationsPage() {
-  const [view, setView] = useState<'all' | 'unread' | 'marked'>('all')
+  const [view, setView] = useState<'all' | 'unread' | 'marked' | 'settings'>('all')
   const unreadOnly = view === 'unread'
   const [limit, setLimit] = useState(50)
   const { data, error, reload } = useData<Notes>(`/notifications?limit=${limit}&unread=${unreadOnly ? 1 : 0}`, 30000)
@@ -105,18 +170,20 @@ export default function NotificationsPage() {
     <Page title={t('Benachrichtigungen')}
       subtitle={marked === null ? t('Neues zu deinen markierten Serien und Autoren')
         : t('Neues zu deinen markierten Serien und Autoren ({{v0}} {{v1}}, {{v2}} {{v3}})', { v0: follows!.series.length, v1: follows!.series.length === 1 ? t('Serie') : t('Serien'), v2: follows!.authors.length, v3: follows!.authors.length === 1 ? t('Autor') : t('Autoren') })}
-      actions={view !== 'marked' && data && data.total > 0 ? (
+      actions={(view === 'all' || view === 'unread') && data && data.total > 0 ? (
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => read()} disabled={!data.unread}><CheckCheck size={15} aria-hidden />{t('Alle als gelesen markieren')}</Button>
           <Button onClick={clear} title={t('Entfernt alle gelesenen Benachrichtigungen aus der Liste')}><Trash2 size={15} aria-hidden />{t('Gelesene entfernen')}</Button>
         </div>
       ) : undefined}>
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex flex-wrap gap-2">
         <Chip active={view === 'all'} onClick={() => setView('all')}>{t('Alle')}</Chip>
         <Chip active={view === 'unread'} onClick={() => setView('unread')} count={data?.unread}>{t('Ungelesen')}</Chip>
         <Chip active={view === 'marked'} onClick={() => setView('marked')} count={marked ?? undefined}>{t('Markiert')}</Chip>
+        <Chip active={view === 'settings'} onClick={() => setView('settings')}>{t('Einstellungen')}</Chip>
       </div>
-      {view === 'marked' ? <Marked onChange={reloadFollows} />
+      {view === 'settings' ? <Settings />
+        : view === 'marked' ? <Marked onChange={reloadFollows} />
         : error && !data ? <ErrorBox message={error} onRetry={reload} />
         : !data ? <div className="skeleton h-64 rounded-2xl" />
         : data.items.length === 0 ? (

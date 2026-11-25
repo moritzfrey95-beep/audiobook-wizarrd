@@ -14,7 +14,7 @@ type Common = Pick<Series, 'name' | 'author' | 'flags' | 'added_at' | 'missing' 
 const common = (it: Item): Common => it.kind === 'series' ? it.s : it.g
 const NONE = { genres: [] as string[], tags: [] as string[] }
 
-const FILTERS: Flag[] = ['incomplete', 'upcoming', 'searching', 'downloading', 'review', 'failed', 'complete', 'unknown', 'single', 'absent']
+const FILTERS: Flag[] = ['incomplete', 'upcoming', 'searching', 'downloading', 'review', 'failed', 'complete', 'ended', 'unknown', 'single', 'absent']
 const SORTS = { name: t('Name'), added: t('Zuletzt hinzugefügt'), missing: t('Meiste fehlende Bände'), next: t('Nächster Erscheinungstermin'), hours: t('Längste Laufzeit') }
 type Sort = keyof typeof SORTS
 

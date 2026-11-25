@@ -250,7 +250,9 @@ def _merge(c, ed, series_asin: str, children: list[dict]) -> None:
                       " release_date, runtime_min, cover_url, owned, audible_min) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0,?)",
                       (ed["id"], lang, ch["asin"], *vals, ch["runtime_min"]))
             new_id = c.execute("SELECT last_insert_rowid()").fetchone()[0]
-            if ed["synced_at"]:  # nicht beim ersten Abgleich einer Serie: da ist jeder Band «neu»
+            if ed["synced_at"]:
+                # Neuer Band in einer als beendet markierten Serie: die Markierung stimmt nicht mehr
+                c.execute("UPDATE series SET ended=NULL WHERE id=? AND ended IS NOT NULL", (ed["series_id"],))  # nicht beim ersten Abgleich einer Serie: da ist jeder Band «neu»
                 from . import notifications, notify
                 upcoming = (ch["release_date"] or "") > today
                 when = "" if not upcoming else "Termin offen" if ch["release_date"] >= "2100" else "erscheint am " + ".".join(reversed(ch["release_date"].split("-")))
@@ -266,12 +268,19 @@ def _merge(c, ed, series_asin: str, children: list[dict]) -> None:
             c.execute("DELETE FROM book WHERE id=?", (b["id"],))
 
 
+ENDED_AGE_DAYS = 30  # beendete Serien: nur noch monatlich, falls der Autor doch weiterschreibt
+
+
 def sync_series(progress=lambda msg: None, max_age_days: float = 3) -> str:
     c = db.conn()
-    limit = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).isoformat()
+    now = datetime.now(timezone.utc)
+    limit = (now - timedelta(days=max_age_days)).isoformat()
+    ended_limit = (now - timedelta(days=max(max_age_days, ENDED_AGE_DAYS))).isoformat()
     ids = [r["id"] for r in c.execute(
-        "SELECT id FROM edition WHERE synced_at IS NULL OR synced_at < ? OR (audible_asin IS NULL AND kind IS NULL)"  # ungeprüfte sofort
-        " ORDER BY synced_at IS NOT NULL, synced_at", (limit,))]
+        "SELECT e.id FROM edition e JOIN series s ON s.id=e.series_id"
+        " WHERE e.synced_at IS NULL OR (e.audible_asin IS NULL AND e.kind IS NULL)"  # ungeprüfte sofort
+        " OR e.synced_at < CASE WHEN s.ended IS NULL THEN ? ELSE ? END"
+        " ORDER BY e.synced_at IS NOT NULL, e.synced_at", (limit, ended_limit))]
     errors = 0
     for i, eid in enumerate(ids, 1):
         if sync_edition(eid) != "ok":
@@ -283,30 +292,33 @@ def sync_series(progress=lambda msg: None, max_age_days: float = 3) -> str:
 
 # ---------- Autoren ----------
 
-def author_series(lang: str, author: str) -> list[dict]:
-    """Alle Serien eines Autors in einer Sprache (Katalogabfrage nach Autor, Shop der Sprache)."""
-    want, key = config.AUDIBLE_LANG[lang], db.norm(author)
+def author_series(lang: str, author: str, also: list[str] | tuple = ()) -> list[dict]:
+    """Alle Serien eines Autors in einer Sprache (Katalogabfrage nach Autor, Shop der Sprache). also: weitere Schreibweisen
+    desselben Autors (zusammengeführt), die Audible als eigene Autoren führt."""
+    want = config.AUDIBLE_LANG[lang]
+    keys = {db.norm(n) for n in (author, *also)}
     found: dict[str, dict] = {}
-    for page in range(6):
-        d = _get(lang, "/1.0/catalog/products", author=author, num_results=50, page=page,
-                 response_groups="contributors,product_attrs,series,media")
-        prods = d.get("products", [])
-        for p in prods:
-            if p.get("language") != want or p.get("content_type") not in (None, "Product"):
-                continue
-            if key not in {db.norm(a["name"]) for a in p.get("authors") or []}:
-                continue
-            for s in (p.get("series") or [])[:1]:
-                e = found.setdefault(s["asin"], {"series_asin": s["asin"], "series_title": s["title"], "seqs": set(),
-                                                 "cover_url": None, "first_asin": None, "low": 1e9})
-                seq = db.parse_seq(s.get("sequence"))
-                if seq is None:
+    for name in (author, *also):
+        for page in range(6):
+            d = _get(lang, "/1.0/catalog/products", author=name, num_results=50, page=page,
+                     response_groups="contributors,product_attrs,series,media")
+            prods = d.get("products", [])
+            for p in prods:
+                if p.get("language") != want or p.get("content_type") not in (None, "Product"):
                     continue
-                e["seqs"].add(seq)
-                if seq < e["low"]:
-                    e.update(low=seq, cover_url=_cover(p), first_asin=p["asin"])
-        if len(prods) < 50:
-            break
+                if keys.isdisjoint(db.norm(a["name"]) for a in p.get("authors") or []):
+                    continue
+                for s in (p.get("series") or [])[:1]:
+                    e = found.setdefault(s["asin"], {"series_asin": s["asin"], "series_title": s["title"], "seqs": set(),
+                                                     "cover_url": None, "first_asin": None, "low": 1e9})
+                    seq = db.parse_seq(s.get("sequence"))
+                    if seq is None:
+                        continue
+                    e["seqs"].add(seq)
+                    if seq < e["low"]:
+                        e.update(low=seq, cover_url=_cover(p), first_asin=p["asin"])
+            if len(prods) < 50:
+                break
     return [e for e in found.values() if e["seqs"]]
 
 
@@ -322,7 +334,8 @@ def sync_authors(progress=lambda msg: None, max_age_days: float = 7) -> str:
     todo = [(k, a, lang) for k, a in sorted(authors.items()) for lang in config.LANGS if (k, lang) not in done and k]
     for i, (key, author, lang) in enumerate(todo, 1):
         try:
-            rows = author_series(lang, author)
+            from . import authors as authors_mod
+            rows = author_series(lang, author, authors_mod.names_of(key))
         except Exception:
             continue
         c.execute("BEGIN IMMEDIATE")
