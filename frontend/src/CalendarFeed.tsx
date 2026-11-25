@@ -4,6 +4,10 @@ import { api, useData } from './api'
 import { Button, Chip, ErrorBox, ask } from './ui'
 import { t, uiLang } from './i18n'
 
+/** Android kennt webcal:// nicht (Fehler ERR_UNKNOWN_URL_SCHEME), dort nur Google Kalender und Link kopieren. */
+const ANDROID = /Android/i.test(navigator.userAgent)
+const LINK = 'inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-accent hover:bg-surface-2'
+
 type Scope = 'followed' | 'monitored' | 'all'
 type Lang = 'all' | 'de' | 'en'
 
@@ -17,6 +21,7 @@ export function CalendarFeed() {
   const [copied, setCopied] = useState(false)
   const tok = token ?? data?.token
   const url = tok ? `${window.location.origin}/api/calendar.ics?token=${encodeURIComponent(tok)}&lang=${lang}&scope=${scope}&ui=${uiLang()}` : ''
+  const webcal = url.replace(/^https?:/, 'webcal:')
   const copy = async () => {
     try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { /* Zwischenablage gesperrt: Feld markieren */ }
   }
@@ -47,10 +52,17 @@ export function CalendarFeed() {
             className="h-10 w-full rounded-lg border border-line bg-bg px-3 font-mono text-xs" />
           <div className="mt-2 flex flex-wrap gap-2">
             <Button onClick={copy} disabled={!url}>{copied ? <Check size={15} aria-hidden /> : <Copy size={15} aria-hidden />}{copied ? t('Kopiert') : t('Link kopieren')}</Button>
-            {url && <a href={url.replace(/^https?:/, 'webcal:')} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-accent hover:bg-surface-2"><CalendarPlus size={15} aria-hidden />{t('In Kalender-App öffnen')}</a>}
+            {url && !ANDROID && <a href={webcal} className={LINK}><CalendarPlus size={15} aria-hidden />{t('In Kalender-App öffnen')}</a>}
+            {url && <a href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`} target="_blank" rel="noreferrer" className={LINK}><CalendarPlus size={15} aria-hidden />{t('In Google Kalender')}</a>}
             <Button onClick={renew}><RefreshCw size={15} aria-hidden />{t('Neuer Link')}</Button>
           </div>
           <p className="mt-2 text-xs text-faint">{t('Wer den Link kennt, sieht deinen Kalender. Bei Bedarf einen neuen Link erzeugen.')}</p>
+          {tok && (
+            <p className="mt-3 border-t border-line pt-3 text-sm text-muted">
+              {t('Als Feed: deine Meldungen (neu im Bestand, angekündigt, erschienen, Sprecher) für Feed-Reader.')}{' '}
+              <a href={`${window.location.origin}/api/feed.atom?token=${encodeURIComponent(tok)}&ui=${uiLang()}`} className="font-semibold text-accent hover:underline">{t('Atom-Feed')}</a>
+            </p>
+          )}
         </>
       )}
     </div>

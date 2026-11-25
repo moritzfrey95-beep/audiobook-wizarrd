@@ -66,4 +66,6 @@ services:
       # Ganze Musik-Freigabe: Bibliotheken und Papierkorb der Umwandlung liegen so auf derselben Platte (Verschieben statt Kopieren)
       - ${MUSIC_ROOT_HOST:-/dev/null}:/library-root
       - ${NTFY_TOKEN_HOST_FILE:-/dev/null}:/run/secrets/ntfy_token:ro
+      # Optional: Eingangsordner für den Handimport (Hörbücher, die nicht über ABW geladen wurden); nur lesend
+      - ${IMPORT_HOST:-/dev/null}:/import:ro
     # Laufen Prowlarr, SABnzbd usw. in anderen Compose-Projekten, ihre Netze in compose.override.yaml ergänzen

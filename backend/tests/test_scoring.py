@@ -265,3 +265,33 @@ def test_first_title_used_as_series_label_is_no_bundle():
     r = score(b, {"title": "Arthur Stone - Weirdest Noob 02 - A Slave in the Locked Lands (Unabr - M4B)", "size": 600_000_000},
               [t for k, t in titles.items() if k != "1"])
     assert r["bundle"] is None and r["verdict"] != "sicher", r["reasons"]
+
+
+def test_german_bundle_words_mark_german_release():
+    # «Sammelpack», «Folge», «ungekrzt» stehen nur in deutschen Releases: für die englische Fassung nie sicher
+    fq = dict(title="The Rise of Chess", author="Kit Falbo", series="Fair Quest", sequence="2", lang="en", runtime_min=720,
+              seq_runtimes={"1": 800, "2": 720})
+    r = score(fq, {"title": "Kit Falbo - Fair Quest 01 - 02 (Sammelpack)", "size": 1_629_875_893}, [])
+    assert r["verdict"] == "verworfen"
+    assert any("Deutsche Ausgabe" in x["text"] for x in r["reasons"])
+    sq = dict(title="Survival Quest", author="Vasily Mahanenko", series="The Way of the Shaman", sequence="1", lang="en", runtime_min=700)
+    assert verdict(sq, "Vasily Mahanenko - Survival Quest - Folge 01-07 (ungekrzt) (Sammelpack)", 4_000_000_000) == "verworfen"
+
+
+def test_abridged_is_never_safe():
+    hj = dict(title="Der Hundertjährige, der aus dem Fenster stieg und verschwand", author="Jonas Jonasson",
+              series="", sequence=None, lang="de", runtime_min=500)
+    assert verdict(hj, "Jonas Jonasson - Der Hundertjaehrige der aus dem Fenster stieg und verschwand (Gekuerzt) Hoerbuch",
+                   400_000_000) == "unsicher"
+    assert verdict(hj, "Jonas Jonasson - Der Hundertjaehrige der aus dem Fenster stieg und verschwand (Gekrzt)",
+                   400_000_000) != "sicher"
+    assert verdict(EN8, "Matt Dinniman - Dungeon Crawler Carl, Book 8 - A Parade of Horribles (Abridged)") == "unsicher"
+
+
+def test_german_small_words_mark_german_edition_of_english_book():
+    beren = dict(title="Beren and Lúthien", author="J. R. R. Tolkien, Christopher Tolkien", series=None, sequence=None, lang="en", runtime_min=415)
+    r = score(beren, {"title": "J.R.R. Tolkien - Beren und Lúthien", "size": 420_000_000}, [])
+    assert r["verdict"] != "sicher" and any("Deutsche Wörter" in x["text"] for x in r["reasons"])
+    # steht das Wort im gesuchten Titel, zählt es nicht
+    das = dict(title="Das Kapital Explained", author="A", series=None, sequence=None, lang="en", runtime_min=400)
+    assert not any("Deutsche Wörter" in x["text"] for x in score(das, {"title": "A - Das Kapital Explained", "size": 400_000_000}, [])["reasons"])

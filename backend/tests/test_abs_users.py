@@ -144,10 +144,10 @@ def test_fortschritt_pro_benutzer_und_markieren(admin):
     # Administrator ohne Verknüpfung sieht den Stand des Kontos, mit dem ABW liest
     assert admin.get("/api/series/2").json()["listened"] == 1 and admin.get("/api/series/1").json()["listened"] == 0
     # Fertig gehört: Serie und Autor markiert, auch beim Einzelbuch der Autor; nur Angehörtes zählt nicht
-    assert bea.get("/api/follows").json() == {"series": [1], "authors": ["janedoe", "willwight"]} or \
+    assert bea.get("/api/follows").json() == {"series": [1], "authors": ["janedoe", "willwight"], "narrators": []} or \
         sorted(bea.get("/api/follows").json()["authors"]) == ["janedoe", "willwight"]
     assert bea.get("/api/follows").json()["series"] == [1]
-    assert admin.get("/api/follows").json() == {"series": [2], "authors": ["frankherbert"]}
+    assert admin.get("/api/follows").json() == {"series": [2], "authors": ["frankherbert"], "narrators": []}
     # Entfernt Bea eine Markierung, setzt der nächste Abgleich sie nicht wieder
     bea.post("/api/follow", json={"kind": "series", "key": "1", "on": False})
     abs_mod.sync_progress()

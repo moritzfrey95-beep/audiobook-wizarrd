@@ -91,9 +91,10 @@ def qbittorrent(url: str, username: str, password: str) -> dict:
     try:
         with httpx.Client(base_url=url.rstrip("/"), timeout=TIMEOUT, headers={"Referer": url}) as c:
             r = c.post("/api/v2/auth/login", data={"username": username, "password": password})
-            r.raise_for_status()
-            if r.text.strip() != "Ok.":
+            # qBittorrent bis 5.1 antwortet «Ok.», neuere Versionen leer mit 204; falsche Anmeldung: «Fails.» oder 401
+            if r.status_code == 401 or (r.status_code != 204 and r.text.strip() != "Ok.") or not c.cookies:
                 return {"ok": False, "text": "Anmeldung abgelehnt, Benutzer und Passwort prüfen"}
+            r.raise_for_status()
             v = c.get("/api/v2/app/version").text.strip()
     except Exception as exc:  # noqa: BLE001
         return _fail(exc)

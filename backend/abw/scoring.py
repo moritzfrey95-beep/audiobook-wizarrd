@@ -3,7 +3,12 @@ import re
 import unicodedata
 
 STOP = frozenset("the a an of and in to for at on der die das des dem den ein eine und von zu im am book band volume vol teil".split())
-GERMAN = frozenset("german deutsch ger hoerbuch horbuch ungekurzt gekurzt".split())
+# «ungekrzt»: Umlaut beim Hochladen verloren. «Sammelpack», «Folge»: nur in deutschen Releases üblich
+GERMAN = frozenset("german deutsch ger hoerbuch horbuch ungekurzt gekurzt ungekuerzt gekuerzt ungekrzt gekrzt sammelpack sammelband sammelbox "
+                   "gesamtausgabe komplettausgabe komplettpaket gesamtpaket folge folgen".split())
+# Kleine deutsche Wörter im Releasenamen: «Beren und Lúthien» ist die deutsche Ausgabe von «Beren and Lúthien».
+# Ohne «die», «den», «des», «von»: kommen in englischen Titeln und Namen vor
+GERMAN_SMALL = frozenset("und das dem der eine vom zum zur".split())
 ENGLISH = frozenset("book books unabridged abridged narrated adventure novel".split())  # in deutschen Releases: Band, Teil, Folge, ungekürzt
 FOREIGN = {"svensk": "Schwedisch", "se": "Schwedisch", "espanol": "Spanisch", "spanish": "Spanisch", "es": "Spanisch",
            "french": "Französisch", "francais": "Französisch", "fr": "Französisch", "italian": "Italienisch",
@@ -268,6 +273,8 @@ def score(book: dict, release: dict, siblings: list[str] = ()) -> dict:
         add(-60, f"Andere Sprache: {foreign}")
     elif book["lang"] == "en" and german:
         add(-40, "Deutsche Ausgabe, gesucht ist Englisch")
+    elif book["lang"] == "en" and (de_small := sorted(GERMAN_SMALL & have - set(words(" ".join(str(book.get(k) or "") for k in ("title", "series", "author")))))):
+        add(-40, f"Deutsche Wörter im Namen ({', '.join(de_small)}), gesucht ist Englisch")
     elif book["lang"] == "de" and german:
         add(10, "Als deutsch gekennzeichnet")
     elif book["lang"] == "de" and book.get("same_title_other_lang"):
@@ -300,8 +307,9 @@ def score(book: dict, release: dict, siblings: list[str] = ()) -> dict:
             add(10, f"Fassung genannt ({marker})")
         else:
             add(-25, f"Gesucht ist die Fassung «{marker}», sie ist im Treffer nicht genannt")
-    if re.search(r"(?<!un)\babridged\b|(?<!un)\bgekurzt\b", p):
-        add(-20, "Gekürzte Fassung")
+    if re.search(r"(?<!un)\babridged\b|(?<!un)\bgek(?:ue|u)?rzt\b", p):
+        # nie automatisch: höchstens «unsicher», auch wenn sonst alles passt
+        add(-25, "Gekürzte Fassung")
     # «The Complete Story … Book 5 - Order of the Phoenix» ist ein Einzelband aus einer Reihe: nur das Wort zählt dann nicht
     single = number_ok and cov >= 0.8 and not sp and not multi_range(p)
     # Gesamtausgabe dieser Serie ohne Bandangabe («Complete Series», Autor genannt): enthält den Band vermutlich.

@@ -106,3 +106,23 @@ def test_owned_omnibus_covers_its_volumes(monkeypatch):
          "runtime_min": 300, "cover_url": None, "language": "english", "content_type": "Product", "format_type": "unabridged"} for k in kids]))
     assert audible.sync_edition(eid) == "ok"
     assert c.execute("SELECT COUNT(*) FROM book WHERE edition_id=? AND owned=0", (eid,)).fetchone()[0] == 0
+
+
+def test_single_books_get_audible_runtime(monkeypatch):
+    # Einzelbücher ohne Audible-Serie: Laufzeit über die ASIN, damit die Ankunftsprüfung mit Audible vergleicht
+    db.init()
+    c = db.conn()
+    _, eid = _ed(c, "Einzel Laufzeit Test", "de", None, "Einzel Autor", [300])
+    c.execute("UPDATE book SET asin='B0LAUFZEIT' WHERE edition_id=?", (eid,))
+
+    def get(lang, path, **params):
+        if path == "/1.0/catalog/products" and params.get("asins"):
+            return {"products": [{"asin": "B0LAUFZEIT", "runtime_length_min": 926}]}
+        if path == "/1.0/catalog/products":
+            return {"products": []}
+        return {"product": {"asin": "B0LAUFZEIT", "series": []}}
+    monkeypatch.setattr(audible, "_get", get)
+    assert audible.sync_edition(eid).startswith("Fehler")
+    row = c.execute("SELECT audible_min FROM book WHERE edition_id=?", (eid,)).fetchone()
+    assert row["audible_min"] == 926
+    assert c.execute("SELECT kind FROM edition WHERE id=?", (eid,)).fetchone()["kind"] == "single"

@@ -244,9 +244,10 @@ def active_download(book_id: int):
     return db.conn().execute(f"SELECT * FROM download WHERE book_id=? AND state IN ({q})", (book_id, *ACTIVE)).fetchone()
 
 
-def grab(book_id: int, release: dict, auto: bool = False) -> int:
+def grab(book_id: int, release: dict, auto: bool = False, upgrade: bool = False) -> int:
     book, _ = book_ctx(book_id)
-    damaged = bool(book["owned"]) and integrity.is_damaged(book_id)  # Ersatz für ein beschädigtes Buch im Bestand
+    # Ersatz für ein beschädigtes Buch im Bestand, oder Qualitäts-Upgrade: wird nach der Prüfung mit dem Bestand verglichen
+    damaged = bool(book["owned"]) and (upgrade or integrity.is_damaged(book_id))
     if book["owned"] and not damaged:
         raise ValueError("Dieses Buch ist schon im Bestand")
     have = db.conn().execute("SELECT o.title, o.sequence, e.name FROM book_twin t JOIN book o ON o.id=t.twin_id LEFT JOIN edition e ON e.id=o.edition_id"
@@ -262,6 +263,8 @@ def grab(book_id: int, release: dict, auto: bool = False) -> int:
     if release.get("guid") and db.conn().execute(
             "SELECT 1 FROM download WHERE guid=? AND bundle IS NOT NULL AND state IN ('queued','downloading','arrived','review')", (release["guid"],)).fetchone():
         raise ValueError("Dieser Sammelband lädt schon und wird danach aufgeteilt")
+    from . import space
+    space.check()  # zu wenig Platz: Fehler statt Download, einmal am Tag gemeldet
     marker = f"abw-{book_id}-{secrets.token_hex(4)}"
     source = release.get("source") or "usenet"
     ensure_release(book, release)
@@ -704,6 +707,11 @@ def auto_run(progress=lambda msg: None) -> str:
         return "Automatik ist ausgeschaltet"
     if not (usenet.configured() and usenet.sab_configured()):
         return "Usenet oder SABnzbd ist nicht eingerichtet"
+    from . import space
+    try:
+        space.check()
+    except ValueError as exc:
+        return str(exc)
     c = db.conn()
     now = _now()
     # Nach fehlgeschlagenem oder durchgefallenem Download sofort wieder suchen
@@ -774,6 +782,7 @@ def auto_overview() -> dict:
             "auto_cleanup": db.setting("auto_cleanup") == "1", "auto_ebook": db.setting("auto_ebook") == "1",
             "auto_ebook_upcoming": db.setting("auto_ebook_upcoming") == "1", "auto_ebook_listening": db.setting("auto_ebook_listening") == "1", "notify_ebook": db.setting("notify_ebook") == "1", "auto_author_series": db.setting("auto_author_series") == "1",
             "auto_integrity": db.setting("auto_integrity") == "1", "integrity": integrity.stats(),
-            "auto_embed": db.setting("auto_embed") == "1", "embed": embed.stats(),
+            "auto_embed": db.setting("auto_embed") == "1", "embed": embed.stats(), "auto_upgrade": db.setting("auto_upgrade") == "1",
+            "min_free_gb": float(db.setting("min_free_gb") or 0), "space": __import__("abw.space", fromlist=["status"]).status(),
             "batch": int(db.setting("auto_batch")), "open": total, "due": due, "never": never, "unsure": unsure,
             "import_enabled": config.IMPORT_ENABLED}

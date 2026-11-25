@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BellOff, BellRing, CheckCheck, Search, Trash2, Volume2, VolumeX } from 'lucide-react'
+import { BellOff, BellRing, CheckCheck, Mic, Search, Trash2, Volume2, VolumeX } from 'lucide-react'
 import { api, useData } from '../api'
 import { Button, Chip, Cover, Empty, ErrorBox, Page } from '../ui'
 import { NoteRow, type Notes } from '../Notifications'
 import { Switch } from '../Automation'
 import { t } from '../i18n'
 
-interface Follows { series: number[]; authors: string[] }
+interface Follows { series: number[]; authors: string[]; narrators?: string[] }
 interface Overview {
   series: { id: number; name: string; author: string; author_key: string; cover: string | null; muted?: boolean }[]
   authors: { key: string; name: string; series: number }[]
+  narrators: { key: string; name: string; books: number }[]
 }
 
 /** Übersicht, zu welchen Serien und Autoren der Benutzer Benachrichtigungen bekommt, mit Abstellen pro Eintrag.
@@ -30,7 +31,14 @@ function Marked({ onChange }: { onChange: () => void }) {
       setMutes(m => ({ ...m, [s.id]: on }))
     } finally { setBusy(null) }
   }
-  const toggle = async (kind: 'series' | 'author', key: string) => {
+  const [narr, setNarr] = useState('')
+  const [narrErr, setNarrErr] = useState<string | null>(null)
+  const addNarrator = async () => {
+    setNarrErr(null)
+    try { await api('/follow', { method: 'POST', body: JSON.stringify({ kind: 'narrator', key: narr, on: true }) }); setNarr(''); reload(); onChange() }
+    catch (e) { setNarrErr((e as Error).message) }
+  }
+  const toggle = async (kind: 'series' | 'author' | 'narrator', key: string) => {
     const id = `${kind}:${key}`
     setBusy(id)
     try {
@@ -41,14 +49,41 @@ function Marked({ onChange }: { onChange: () => void }) {
   }
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />
   if (!data) return <div className="skeleton h-64 rounded-2xl" />
-  if (!data.series.length && !data.authors.length) return (
+  const narrators = (
+    <section>
+      <h2 className="mb-2 text-sm font-semibold text-muted">{t('Sprecher ({{v0}})', { v0: data.narrators.length })}</h2>
+      <form className="mb-2 flex max-w-md gap-2" onSubmit={e => { e.preventDefault(); if (narr.trim()) addNarrator() }}>
+        <input value={narr} onChange={e => setNarr(e.target.value)} placeholder={t('Name des Sprechers, wie bei Audible')} aria-label={t('Sprecher markieren')}
+          className="min-h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm" />
+        <Button type="submit" disabled={!narr.trim()}><Mic size={15} aria-hidden />{t('Markieren')}</Button>
+      </form>
+      {narrErr && <p role="status" className="mb-2 text-sm">{narrErr}</p>}
+      {data.narrators.length > 0 && (
+        <ul className="divide-y divide-line rounded-xl border border-line bg-surface p-1.5">
+          {data.narrators.map(a => (
+            <li key={a.key} className={`flex items-center gap-3 p-2 ${off.has(`narrator:${a.key}`) ? 'opacity-55' : ''}`}>
+              <div className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{a.name}</span>
+                <span className="text-sm text-muted">{t('{{v0}} Bücher im Bestand', { v0: a.books })}</span>
+              </div>
+              {btn('narrator', a.key, a.name)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+  if (!data.series.length && !data.authors.length && !data.narrators.length) return (
+    <div className="space-y-6">
     <Empty title={t('Nichts markiert')} text={t('Öffne eine Serie oder einen Autor und drücke «Markieren»; was du unter Entdecken hinzufügst, ist automatisch markiert.')}
       action={<Link to="/" className="text-sm font-semibold text-accent underline-offset-4 hover:underline">{t('Zu den Serien')}</Link>} />
+    {narrators}
+    </div>
   )
   const needle = q.trim().toLowerCase()
   const series = data.series.filter(s => !needle || `${s.name} ${s.author}`.toLowerCase().includes(needle))
   const authors = data.authors.filter(a => !needle || a.name.toLowerCase().includes(needle))
-  const btn = (kind: 'series' | 'author', key: string, label: string) => {
+  const btn = (kind: 'series' | 'author' | 'narrator', key: string, label: string) => {
     const id = `${kind}:${key}`
     const isOff = off.has(id)
     return (
@@ -106,6 +141,7 @@ function Marked({ onChange }: { onChange: () => void }) {
           </ul>
         )}
       </section>
+      {narrators}
     </div>
   )
 }
@@ -118,6 +154,7 @@ const KIND_HINT: Record<string, string> = {
   released: t('Der Erscheinungstag eines angekündigten Bandes ist da; ABW sucht ihn jetzt.'),
   available: t('Ein Buch ist in der Bibliothek angekommen.'),
   new_series: t('Ein markierter Autor hat eine neue Serie.'),
+  narrator: t('Ein markierter Sprecher liest ein neues Hörbuch (Audible.com und Audible.de, täglich geprüft).'),
   epub: t('ABW hat ein E-Book neben ein Hörbuch gelegt.'),
   recommend: t('Ein anderer Benutzer empfiehlt dir eine Serie.'),
   rate: t('Nach dem Hören: Erinnerung, das Buch zu bewerten.'),

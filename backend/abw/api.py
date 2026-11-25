@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from . import __version__
 from . import abs as abs_mod
-from . import activity, audible, auth, authors as authors_mod, chapters, cleanup, config, convert, db, ebook, folders, foryou, i18n, icsfeed, importer, integrity, libsplit, library, librarytags, listened, listening, notifications, notify, plugins, push, ratings, search, setup, tasks, titles, toread, torrent, usenet, variants, verify, wishlist
+from . import activity, atomfeed, audible, auth, authors as authors_mod, chapters, cleanup, config, convert, db, ebook, folders, foryou, i18n, icsfeed, importer, integrity, invites, libsplit, library, librarytags, listened, listening, manual, mcp, metrics, notifications, notify, plugins, push, ratings, search, setup, tasks, titles, toread, torrent, upgrade, usenet, variants, verify, wishlist, wrapped
 
 app = FastAPI(title="AudioBook Wizarrd", version=__version__)
 PRIORITY = ["downloading", "review", "failed", "searching", "incomplete", "upcoming", "ended", "complete", "unknown", "single", "absent", "unmonitored"]
@@ -403,10 +403,10 @@ def external(request: Request) -> bool:
 
 # Benutzer mit der Rolle «user» dürfen ansehen, hinzufügen, markieren, die automatische Suche für Serien und Bücher
 # anstossen und ihr Goodreads-Regal verknüpfen. Alles andere (Prüfen, Aufgaben, Schalter, Auswahl von Hand) ist dem Administrator vorbehalten.
-USER_READ = re.compile(r"^/api/(series(/\d+(/autosearch)?)?|authors(/[^/]+)?|discover/.+|watchlist|calendar(/feed)?|stats|listening|cover/.+|notifications(/prefs)?|follows(/overview)?|me|me/apikeys|push|listened"
+USER_READ = re.compile(r"^/api/(wrapped|series(/\d+(/autosearch)?)?|singles(/[^/]+)?|library/tags|authors(/[^/]+)?|discover/.+|watchlist|calendar(/feed)?|stats|listening|cover/.+|notifications(/prefs)?|follows(/overview)?|me|me/apikeys|push|listened"
                        r"|books/\d+/autosearch|ratings/(count|open|mine|tags|stats)|toread(/keys|/asins|/heard|/users|/picks)?)$")
 USER_WRITE = re.compile(r"^/api/(series/\d+/autosearch|books/\d+/autosearch|watchlist(/[^/]+)?|follow(/mute)?|notifications/(read|clear|prefs)|push/(subscribe|unsubscribe|test)"
-                        r"|me/goodreads(/csv|/sync)?|me/prefs|me/apikeys(/\d+)?|calendar/feed|books/\d+/listened|ratings/(book|edition)/\d+|toread(/order|/discover|/picks/decide|/recommend|/rec/[eb]\d+|/suggest/\d+|/(book|edition)/\d+)?)$")
+                        r"|mcp|me/goodreads(/csv|/sync)?|me/prefs|me/apikeys(/\d+)?|calendar/feed|books/\d+/listened|ratings/(book|edition)/\d+|toread(/order|/discover|/picks/decide|/recommend|/rec/[eb]\d+|/suggest/\d+|/(book|edition)/\d+)?)$")
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -440,7 +440,9 @@ async def guard(request: Request, call_next):
     path = request.url.path
     request.state.user = dict(auth.OPEN_USER)
     i18n.lang.set(i18n.pick(request.headers.get("x-abw-lang")))
-    if path == "/api/calendar.ics":
+    if path.startswith("/api/invite/"):
+        return await call_next(request)  # Einladung: ohne Anmeldung lesbar, zeigt nur Adressen und Namen
+    if path in ("/api/calendar.ics", "/api/feed.atom"):
         # Kalender-Apps schicken kein Cookie: der Schlüssel im Link gilt nur für diese eine Adresse
         user = auth.token_user(request.query_params.get("token"), "ics")
         if not user:
@@ -797,7 +799,10 @@ def follow_overview(request: Request):
         if db.norm(name) in want:
             names.setdefault(db.norm(name), name)
     authors = [{"key": k, "name": names.get(k, k), "series": sum(1 for s in data.values() if db.norm(s["author"]) == k)} for k in want]
-    return {"series": sorted(series, key=lambda s: db.norm(s["name"])), "authors": sorted(authors, key=lambda a: db.norm(a["name"]))}
+    narr = [{"key": n, "name": n, "books": c.execute("SELECT COUNT(*) FROM book WHERE owned=1 AND narrator LIKE ?", (f"%{n}%",)).fetchone()[0]}
+            for n in f["narrators"]]
+    return {"series": sorted(series, key=lambda s: db.norm(s["name"])), "authors": sorted(authors, key=lambda a: db.norm(a["name"])),
+            "narrators": sorted(narr, key=lambda a: db.norm(a["name"]))}
 
 
 class Follow(BaseModel):
@@ -810,6 +815,8 @@ class Follow(BaseModel):
 def follow_set(body: Follow, request: Request):
     try:
         notifications.follow(me(request)["id"], body.kind, body.key, body.on)
+        if body.kind == "narrator" and body.on:
+            tasks.request("narrators")  # erster Lauf merkt sich die vorhandenen Titel, ohne zu melden
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     return {"ok": True}
@@ -1274,6 +1281,8 @@ class Automation(BaseModel):
     auto_author_series: bool | None = None
     auto_integrity: bool | None = None
     auto_embed: bool | None = None
+    auto_upgrade: bool | None = None
+    min_free_gb: float | None = None
 
 
 @app.post("/api/automation")
@@ -1284,12 +1293,84 @@ def automation_set(body: Automation):
             tasks.request("auto")
     if body.auto_import is not None:
         db.set_setting("auto_import", "1" if body.auto_import else "0")
-    for key in ("auto_cleanup", "auto_convert", "auto_chapters", "notify", "auto_ebook", "auto_ebook_upcoming", "auto_ebook_listening", "notify_ebook", "auto_author_series", "auto_integrity", "auto_embed"):
+    for key in ("auto_cleanup", "auto_convert", "auto_chapters", "notify", "auto_ebook", "auto_ebook_upcoming", "auto_ebook_listening", "notify_ebook", "auto_author_series", "auto_integrity", "auto_embed", "auto_upgrade"):
         if getattr(body, key) is not None:
             db.set_setting(key, "1" if getattr(body, key) else "0")
     if body.auto_author_series:
         tasks.request("author_series")
+    if body.min_free_gb is not None:
+        if not 0 <= body.min_free_gb <= 10000:
+            raise HTTPException(400, "Ungültige Grenze")
+        db.set_setting("min_free_gb", f"{body.min_free_gb:g}")
+    if body.auto_upgrade:
+        tasks.request("upgrade")
     return search.auto_overview()
+
+
+@app.get("/api/manual")
+def manual_list(refresh: bool = False):
+    """Ordner für den Handimport mit Vorschlägen, welches Buch es sein könnte."""
+    return {"roots": [{"name": n, "path": str(p)} for n, p in manual.roots()], "items": manual.folders(refresh)}
+
+
+@app.get("/api/manual/books")
+def manual_books(q: str):
+    """Bücher der Bibliothek zu einem Suchtext (Titel, Serie, Autor, Bandnummer), fehlende zuerst."""
+    return manual.suggest(q, manual._books(), n=12) if len(q.strip()) >= 2 else []
+
+
+class ManualStart(BaseModel):
+    path: str
+    book_id: int
+
+
+@app.post("/api/manual")
+def manual_start(body: ManualStart):
+    try:
+        return manual.start(body.path, body.book_id)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+class ManualHide(BaseModel):
+    path: str
+
+
+@app.post("/api/manual/hide")
+def manual_hide(body: ManualHide):
+    manual.hide(body.path)
+    return {"ok": True}
+
+
+@app.get("/api/upgrade")
+def upgrade_overview():
+    """Bücher im Bestand mit schwacher Datenrate oder zu kurz, mit dem Stand der Suche nach einer besseren Fassung."""
+    return upgrade.overview()
+
+
+class UpgradeSettings(BaseModel):
+    kbps: int
+
+
+@app.post("/api/upgrade/settings")
+def upgrade_settings(body: UpgradeSettings):
+    if not 8 <= body.kbps <= 256:
+        raise HTTPException(400, "Die Schwelle muss zwischen 8 und 256 kbit/s liegen")
+    db.set_setting("upgrade_kbps", str(body.kbps))
+    return upgrade.overview()
+
+
+@app.post("/api/upgrade/{book_id}")
+def upgrade_book(book_id: int):
+    """Für ein Buch jetzt eine bessere Fassung suchen (auch bei zu kurzen Büchern, die die Automatik auslässt)."""
+    try:
+        return upgrade.search_one(book_id, auto=False)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.post("/api/books/{book_id}/integrity")
@@ -1863,6 +1944,105 @@ def calendar_ics(request: Request, lang: str = "all", scope: str = "followed"):
                     headers={"Content-Disposition": 'inline; filename="audiobook-wizarrd.ics"', "Cache-Control": "no-store"})
 
 
+@app.get("/api/invite/{code}")
+def invite_get(code: str):
+    try:
+        return invites.get(code)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.get("/api/invite/{code}/qr.svg")
+def invite_qr(code: str, what: str = "abw"):
+    try:
+        inv = invites.get(code)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    url = inv["abw"] if what == "abw" else inv["abs"] if what == "abs" else ""
+    if not url:
+        raise HTTPException(404, "Adresse nicht eingerichtet")
+    return Response(invites.qr_svg(url), media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/invites")
+def invite_list():
+    return {"items": invites.listing(), **invites.urls()}
+
+
+class InviteNew(BaseModel):
+    name: str
+
+
+@app.post("/api/invites")
+def invite_new(body: InviteNew, request: Request):
+    try:
+        return invites.create(body.name, me(request)["id"])
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.delete("/api/invites/{code}")
+def invite_delete(code: str):
+    invites.delete(code)
+    return {"ok": True}
+
+
+@app.get("/api/feed.atom")
+def feed_atom(request: Request):
+    """Meldungen des Benutzers als Atom-Feed (Schlüssel wie beim Kalender-Abo)."""
+    ui = i18n.pick(request.query_params.get("ui"))
+    return Response(atomfeed.build(me(request)["id"], ui), media_type="application/atom+xml; charset=utf-8", headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/mcp")
+async def mcp_endpoint(request: Request):
+    """MCP-Server (Streamable HTTP, JSON-Antworten). Anmeldung mit API-Schlüssel, Rechte des Benutzers."""
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        return JSONResponse(mcp._err(None, -32700, "Ungültiges JSON"), status_code=400)
+    user = me(request)
+    msgs = body if isinstance(body, list) else [body]
+    from starlette.concurrency import run_in_threadpool
+    out = [r for m in msgs if isinstance(m, dict) and (r := await run_in_threadpool(mcp.handle, m, user, load, calendar)) is not None]
+    if not out:
+        return Response(status_code=202)
+    return JSONResponse(out if isinstance(body, list) else out[0])
+
+
+@app.get("/api/mcp")
+def mcp_get():
+    # Kein Server-Sent-Events-Strom: Antworten kommen direkt auf POST
+    return Response(status_code=405, headers={"Allow": "POST"})
+
+
+class McpSettings(BaseModel):
+    write: bool
+
+
+@app.get("/api/mcp/settings")
+def mcp_settings():
+    return {"write": mcp.writable(), "tools": [t["name"] for t in mcp.tool_list()]}
+
+
+@app.post("/api/mcp/settings")
+def mcp_settings_set(body: McpSettings):
+    db.set_setting("mcp_write", "1" if body.write else "0")
+    return mcp_settings()
+
+
+@app.get("/api/metrics")
+def metrics_prom():
+    """Kennzahlen im Prometheus-Format (mit API-Schlüssel eines Administrators)."""
+    return Response(metrics.prometheus(), media_type="text/plain; version=0.0.4; charset=utf-8")
+
+
+@app.get("/api/metrics.json")
+def metrics_json():
+    """Dieselben Kennzahlen als JSON, z. B. für einen REST-Sensor in Home Assistant."""
+    return metrics.collect()
+
+
 @app.get("/api/calendar/feed")
 def calendar_feed(request: Request):
     """Schlüssel für das Kalender-Abo; die Oberfläche baut daraus den Link."""
@@ -2037,6 +2217,25 @@ def listening_overview(request: Request, period: str = "week", offset: int = 0, 
         return listening.overview(period, offset, user)
     row = db.conn().execute("SELECT abs_user_id FROM user WHERE id=?", (u["id"],)).fetchone()
     return listening.overview(period, offset, only=(row["abs_user_id"] if row else None) or "")
+
+
+@app.get("/api/wrapped")
+def wrapped_view(request: Request, year: int = 0, user: str = ""):
+    """Jahresrückblick. Benutzer sehen ihr eigenes Konto, Administratoren jedes oder alle zusammen (user leer)."""
+    u = me(request)
+    if u["role"] == "admin":
+        who = user or None
+    else:
+        row = db.conn().execute("SELECT abs_user_id FROM user WHERE id=?", (u["id"],)).fetchone()
+        who = (row["abs_user_id"] if row else None) or ""
+        if not who:
+            raise HTTPException(404, "Dein Zugang ist mit keinem Audiobookshelf-Konto verknüpft")
+    avail = wrapped.years(who)
+    year = year or (avail[0] if avail else date.today().year)
+    try:
+        return {**wrapped.build(year, who), "years": avail}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 # ---------- Cover und Oberfläche ----------

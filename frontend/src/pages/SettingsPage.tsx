@@ -4,6 +4,7 @@ import { CheckCircle2, CircleSlash, Download, FileUp, KeyRound, Link2, LogOut, R
 import { api, fmtDate, useData } from '../api'
 import { Button, ErrorBox, Page, Section, ask, prompt } from '../ui'
 import { ApiKeys } from '../ApiKeys'
+import { InvitesPanel } from '../Invite'
 import { PushPanel } from '../Push'
 import { GROUPS, GroupForm, type CfgView } from '../Connections'
 import { t } from '../i18n'
@@ -419,6 +420,9 @@ export default function SettingsPage() {
         <Section title={t('Benutzer')} hint={`${data.users.length} ${data.users.length === 1 ? t('Zugang') : t('Zugänge')}`}>
           <UsersPanel users={data.users} meId={m.id} minLength={m.min_length} onChange={reload} />
         </Section>
+      )}
+      {admin && m.auth_enabled && (
+        <Section title={t('Einladen')} hint={t('Seite mit App, Anmeldung und QR-Codes für neue Mitglieder')}><InvitesPanel /></Section>
       )}
       {admin && m.auth_enabled && data && data.users.length > 1 && (
         <Section title={t('Weiterempfehlen')} hint={t('Wer wem Serien empfehlen darf')}>

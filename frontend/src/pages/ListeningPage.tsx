@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 import { fmtNum, useData } from '../api'
 import { Button, Chip, Cover, Empty, ErrorBox, Page, Section } from '../ui'
 import { Bars, Tile } from './StatsPage'
@@ -148,7 +148,8 @@ export default function ListeningPage() {
   const label = PREV[period]
   const empty = !s.seconds
   return (
-    <Page title={t('Hörverlauf')} subtitle={sub}>
+    <Page title={t('Hörverlauf')} subtitle={sub}
+      actions={<Link to="/rueckblick" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-accent-strong px-4 text-sm font-semibold text-on-accent"><Sparkles size={15} aria-hidden />{t('Jahresrückblick')}</Link>}>
       {controls}
       {!d.users.length && <div className="mt-6"><Empty title={t('Noch keine Hörsitzungen')} text={admin
         ? t('Die Aufgabe «Hörverlauf abgleichen» liest sie alle 15 Minuten aus Audiobookshelf. Unter Aufgaben lässt sie sich sofort starten.')

@@ -6,7 +6,7 @@ import { locale, t } from './i18n'
 interface Unsure { book_id: number; title: string; sequence: string | null; lang: string; series: string; series_id: number; unsure: number; last_search: string }
 interface Damaged { book_id: number; title: string; series: string | null; series_id: number | null; detail: string; download_state: string | null }
 interface Integrity { total: number; checked: number; ok: number; errors: number; damaged: Damaged[] }
-interface Auto { auto_embed: boolean; embed: { ok: number; failed: number; busy: number; open: number }; auto_integrity: boolean; integrity: Integrity; auto_ebook: boolean; auto_ebook_upcoming: boolean; auto_ebook_listening: boolean; notify_ebook: boolean; auto_author_series: boolean; auto_convert: boolean; auto_chapters: boolean; notify: boolean; notify_configured: boolean; auto_cleanup: boolean; auto_search: boolean; auto_import: boolean; batch: number; open: number; due: number; never: number; unsure: Unsure[]; import_enabled: boolean }
+interface Auto { min_free_gb: number; space: { name: string; free_gb: number; total_gb: number }[]; auto_upgrade: boolean; auto_embed: boolean; embed: { ok: number; failed: number; busy: number; open: number }; auto_integrity: boolean; integrity: Integrity; auto_ebook: boolean; auto_ebook_upcoming: boolean; auto_ebook_listening: boolean; notify_ebook: boolean; auto_author_series: boolean; auto_convert: boolean; auto_chapters: boolean; notify: boolean; notify_configured: boolean; auto_cleanup: boolean; auto_search: boolean; auto_import: boolean; batch: number; open: number; due: number; never: number; unsure: Unsure[]; import_enabled: boolean }
 
 export function Switch({ on, onChange, label, hint, disabled }: { on: boolean; onChange: (v: boolean) => void; label: string; hint: string; disabled?: boolean }) {
   return (
@@ -33,7 +33,7 @@ export function AutomationPanel() {
   const { data, reload } = useData<Auto>('/automation', 10000)
   const [err, setErr] = useState<string | null>(null)
   if (!data) return <div className="skeleton h-40 rounded-xl" />
-  const set = async (body: Partial<Pick<Auto, 'auto_embed' | 'auto_integrity' | 'auto_search' | 'auto_import' | 'auto_cleanup' | 'auto_convert' | 'auto_chapters' | 'notify' | 'auto_ebook' | 'auto_ebook_upcoming' | 'auto_ebook_listening' | 'notify_ebook' | 'auto_author_series'>>) => {
+  const set = async (body: Partial<Pick<Auto, 'min_free_gb' | 'auto_upgrade' | 'auto_embed' | 'auto_integrity' | 'auto_search' | 'auto_import' | 'auto_cleanup' | 'auto_convert' | 'auto_chapters' | 'notify' | 'auto_ebook' | 'auto_ebook_upcoming' | 'auto_ebook_listening' | 'notify_ebook' | 'auto_author_series'>>) => {
     setErr(null)
     try { await api('/automation', { method: 'POST', body: JSON.stringify(body) }); reload() } catch (e) { setErr((e as Error).message) }
   }
@@ -62,6 +62,8 @@ export function AutomationPanel() {
           hint={t('Meldet in der Glocke und per Push, wenn ABW ein EPUB in einen Buchordner gelegt hat. Ausgeschaltet laden die E-Books still weiter.')} />
         <Switch on={data.auto_author_series} onChange={v => set({ auto_author_series: v })} label={t('Serien gehörter Autoren aufnehmen')}
           hint={t('Hat irgendein Benutzer ein Buch fertig gehört, kommen alle Serien dieses Autors auf Deutsch und Englisch in die Bibliothek und werden gesucht, auch rückwirkend. Ohne gekürzte Fassungen. Entfernte Serien bleiben weg.')} />
+        <Switch on={data.auto_upgrade} onChange={v => set({ auto_upgrade: v })} label={t('Qualitäts-Upgrade')}
+          hint={t('Sucht stündlich für bis zu drei Bücher mit schwacher Tonqualität eine bessere Fassung und lädt nur sichere Treffer. Ersetzt wird nur, wenn die Prüfung den neuen Band eindeutig besser findet, sonst entscheidest du im Tab «Prüfen». Liste unter «Qualitäts-Upgrade».')} />
         <Switch on={data.auto_integrity} onChange={v => set({ auto_integrity: v })} label={t('Bestand auf Schäden prüfen')}
           hint={t('Liest nachts (01–07 Uhr) jede Hörbuchdatei einmal ganz und sucht Lücken aus Null-Bytes, wie sie unfertige Torrents hinterlassen. Beschädigte Bücher werden neu gesucht und nach bestandener Prüfung ersetzt. Geprüft: {{v0}} von {{v1}} Büchern.', { v0: data.integrity.checked.toLocaleString(locale()), v1: data.integrity.total.toLocaleString(locale()) })} />
         <div>
@@ -74,6 +76,16 @@ export function AutomationPanel() {
             </button>
           )}
         </div>
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-4 text-sm">
+        <label className="flex items-center gap-2 font-semibold">
+          {t('Mindest-Speicherplatz')}
+          <select className="min-h-9 rounded-lg border border-line bg-surface-2 px-2 font-normal" value={data.min_free_gb} onChange={e => set({ min_free_gb: Number(e.target.value) })}>
+            {[0, 5, 10, 20, 50, 100].map(v => <option key={v} value={v}>{v === 0 ? t('aus') : t('{{v0}} GB', { v0: v })}</option>)}
+          </select>
+        </label>
+        <span className="text-muted">{t('Darunter startet kein neuer Download, du bekommst eine Meldung.')}{' '}
+          {data.space.map(s => t('{{v0}}: {{v1}} GB frei', { v0: s.name, v1: s.free_gb.toLocaleString(locale()) })).join(' · ')}</span>
       </div>
       {err && <p role="status" className="mt-3 text-sm">{err}</p>}
       <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-4 text-sm">

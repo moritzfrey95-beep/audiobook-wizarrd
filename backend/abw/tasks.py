@@ -5,7 +5,7 @@ import traceback
 from datetime import datetime, timedelta, timezone
 
 from . import abs as abs_mod
-from . import audible, chapters, cleanup, convert, db, ebook, embed, goodreads, integrity, libsplit, library, librarytags, listened, listening, notifications, search, wishlist
+from . import audible, chapters, cleanup, convert, db, ebook, embed, goodreads, integrity, libsplit, library, librarytags, listened, listening, narrators, notifications, search, upgrade, wishlist
 
 # key -> (Name, Beschreibung, Intervall in Minuten, Funktion)
 TASKS = {
@@ -35,12 +35,11 @@ TASKS = {
     "wishlist": ("Wunschliste abgleichen", "Liest die 100 neuesten Bücher der verknüpften Goodreads-Regale (und eingelesene Exporte), sucht sie bei Audible und nimmt Treffer als fehlend in die Bibliothek auf; die Suche läuft dann mit Vorrang.", 720, wishlist.sync),
     "goodreads": ("Goodreads-Genres holen", "Holt über FlareSolverr die Leser-Genres von Goodreads (LitRPG, Cozy, Epic Fantasy …) für gehörte Bücher und die besten Vorschläge unter «Für dich», höchstens 40 Bücher pro Lauf. Ergänzt die Tags aus Audible; einen Monat zwischengespeichert.", 60, goodreads.sync),
     "library_tags": ("Genres und Tags der Bibliothek", "Holt Kategorien und Beschreibung der ersten Bände jeder Serie und aller Einzelbücher bei Audible, damit sich die Serienansicht nach Genre und Tag filtern lässt. Höchstens 1000 Bücher pro Lauf, Audible-Angaben einen Monat zwischengespeichert; neue Serien erscheinen im Filter nach dem nächsten Lauf.", 60, librarytags.sync),
+    "narrators": ("Sprechern folgen", "Fragt Audible.com und Audible.de nach neuen Titeln der markierten Sprecher und meldet sie allen, die den Sprecher markiert haben.", 1440, narrators.check),
+    "upgrade": ("Qualitäts-Upgrade", "Sucht für bis zu drei Bücher im Bestand mit schwacher Datenrate eine bessere Fassung und lädt nur sichere Treffer mit deutlich mehr Daten je Minute. Nach der Ankunft ersetzt nur eine eindeutig bessere Fassung den Bestand. Nur bei eingeschaltetem Schalter.", 60, upgrade.run),
     "authors": ("Autorenkatalog prüfen", "Sucht weitere Serien deiner Autoren auf Audible.com und Audible.de und verknüpft Sprachfassungen.", 1440, audible.sync_authors),
 }
-PLANNED = [
-    ("upgrade", "Qualitäts-Upgrade", "Lädt eine bessere Fassung nach, wenn ein Buch nur in schwacher Qualität vorliegt.", "Etappe 4"),
-    ("manual", "Handimport", "Nimmt von Hand abgelegte Hörbücher aus einem Eingangsordner auf.", "Etappe 4"),
-]
+PLANNED: list[tuple[str, str, str, str]] = []
 
 _state = {k: {"running": False, "progress": "", "queued": False} for k in TASKS}
 

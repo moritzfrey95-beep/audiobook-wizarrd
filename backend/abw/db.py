@@ -62,6 +62,12 @@ CREATE TABLE IF NOT EXISTS book_search (
     last_result TEXT, hits INTEGER, unsure INTEGER
 );
 CREATE TABLE IF NOT EXISTS book_result (book_id INTEGER PRIMARY KEY, searched_at TEXT NOT NULL, payload TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS narrator_seen (narrator TEXT NOT NULL, asin TEXT NOT NULL, seen_at TEXT NOT NULL, PRIMARY KEY(narrator, asin));
+CREATE TABLE IF NOT EXISTS invite (code TEXT PRIMARY KEY, name TEXT NOT NULL, created TEXT NOT NULL, expires TEXT NOT NULL, opened TEXT, created_by INTEGER);
+CREATE TABLE IF NOT EXISTS manual_hidden (path TEXT PRIMARY KEY, hidden_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS upgrade_search (
+    book_id INTEGER PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 0, last_search TEXT, next_search TEXT, last_result TEXT, text TEXT
+);
 CREATE TABLE IF NOT EXISTS book_reject (book_id INTEGER NOT NULL, guid TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY(book_id, guid));
 CREATE TABLE IF NOT EXISTS book_hide (book_id INTEGER NOT NULL, guid TEXT NOT NULL, until TEXT NOT NULL, PRIMARY KEY(book_id, guid));
 CREATE TABLE IF NOT EXISTS convert_job (
@@ -284,7 +290,7 @@ def migrate_users(c) -> None:
     c.execute("UPDATE wishlist_item SET source='gr1' WHERE source='goodreads'")
 
 
-DEFAULTS = {"auto_search": "0", "auto_import": "0", "auto_batch": "10", "auto_cleanup": "0", "auto_convert": "0", "auto_chapters": "0", "notify": "0", "auto_ebook": "0", "auto_ebook_upcoming": "0", "auto_ebook_listening": "1", "notify_ebook": "0", "auto_author_series": "0", "auto_integrity": "0", "auto_embed": "0",
+DEFAULTS = {"auto_search": "0", "auto_import": "0", "auto_batch": "10", "auto_cleanup": "0", "auto_convert": "0", "auto_chapters": "0", "notify": "0", "auto_ebook": "0", "auto_ebook_upcoming": "0", "auto_ebook_listening": "1", "notify_ebook": "0", "auto_author_series": "0", "auto_integrity": "0", "auto_embed": "0", "auto_upgrade": "0", "upgrade_kbps": "40", "min_free_gb": "20", "mcp_write": "0",
             "setup_done": "0", "rec_mode": "admins", "auth_user": "", "auth_hash": "", "goodreads_user": "", "goodreads_shelf": "to-read"}
 
 

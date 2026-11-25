@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from . import db, push
 
 KEEP_DAYS = 180
-KINDS = ("series", "author")
+KINDS = ("series", "author", "narrator")
 # Meldungsarten in der Reihenfolge der Einstellungen. Jede lässt sich je Benutzer abschalten.
 NOTE_KINDS = {
     "announced": "Neuer Band angekündigt",
@@ -15,6 +15,7 @@ NOTE_KINDS = {
     "released": "Erscheinungstag erreicht",
     "available": "Neu im Bestand",
     "new_series": "Neue Serie eines Autors",
+    "narrator": "Neues Hörbuch eines Sprechers",
     "epub": "E-Book abgelegt",
     "recommend": "Empfehlungen anderer Benutzer",
     "rate": "Erinnerung ans Bewerten",
@@ -30,6 +31,10 @@ def follow(user_id: int, kind: str, key, on: bool = True) -> None:
     if kind not in KINDS:
         raise ValueError("Unbekannte Art")
     c = db.conn()
+    if kind == "narrator":
+        key = " ".join(str(key).split())  # Sprecher: der Name selbst, wie bei Audible geschrieben
+        if len(key) < 3:
+            raise ValueError("Bitte den Namen des Sprechers angeben")
     if on:
         c.execute("INSERT OR IGNORE INTO follow(user_id, kind, key, created) VALUES(?,?,?,?)", (user_id, kind, str(key), _now()))
     else:
@@ -37,12 +42,14 @@ def follow(user_id: int, kind: str, key, on: bool = True) -> None:
 
 
 def follows(user_id: int) -> dict:
-    out = {"series": [], "authors": []}
+    out = {"series": [], "authors": [], "narrators": []}
     for r in db.conn().execute("SELECT kind, key FROM follow WHERE user_id=?", (user_id,)):
         if r["kind"] == "series" and r["key"].isdigit():
             out["series"].append(int(r["key"]))
         elif r["kind"] == "author":
             out["authors"].append(r["key"])
+        elif r["kind"] == "narrator":
+            out["narrators"].append(r["key"])
     return out
 
 

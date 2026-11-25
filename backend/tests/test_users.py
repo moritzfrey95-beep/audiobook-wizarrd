@@ -52,6 +52,10 @@ def test_rollen(clients):
         assert user.post(path, json=body).status_code == 403, path
     assert user.delete("/api/users/1").status_code == 403
     # Bewertungen: eigene ansehen, setzen und zurücknehmen
+    # Bibliothek: Einzelbücher und Filter nach Genre/Tag
+    for path in ("/api/singles", "/api/library/tags"):
+        assert user.get(path).status_code == 200, path
+    assert user.get("/api/singles/unbekannt").status_code != 403
     for path in ("/api/ratings/count", "/api/ratings/open", "/api/ratings/mine", "/api/ratings/tags", "/api/ratings/stats"):
         assert user.get(path).status_code == 200, path
     assert user.post("/api/ratings/book/999999", json={"stars": 4}).status_code == 404  # durchgelassen, Buch fehlt
@@ -89,7 +93,7 @@ def test_goodreads_und_meldungen_je_benutzer(clients, monkeypatch):
     assert user.get("/api/me").json()["goodreads"]["user"] == "777" and admin.get("/api/me").json()["goodreads"]["user"] == ""
     uid = user.get("/api/me").json()["id"]
     assert user.post("/api/follow", json={"kind": "series", "key": "42"}).status_code == 200
-    assert user.get("/api/follows").json() == {"series": [42], "authors": []} and admin.get("/api/follows").json()["series"] == []
+    assert user.get("/api/follows").json() == {"series": [42], "authors": [], "narrators": []} and admin.get("/api/follows").json()["series"] == []
     assert notifications.emit("announced", "Neuer Band angekündigt", "S, Band 2", "/serie/42", "announced:1", series_id=42) == 1
     assert notifications.emit("announced", "Neuer Band angekündigt", "S, Band 2", "/serie/42", "announced:1", series_id=42) == 0  # nur einmal
     got = user.get("/api/notifications").json()
@@ -126,7 +130,7 @@ def test_uebersicht_markiert_und_abstellen(clients):
     # Abstellen: weg aus der Übersicht, keine Meldungen mehr, auch nicht für ein selbst hinzugefügtes Serienbuch
     user.post("/api/follow", json={"kind": "series", "key": str(sid), "on": False})
     user.post("/api/follow", json={"kind": "author", "key": db.norm("Autorin A"), "on": False})
-    assert user.get("/api/follows/overview").json() == {"series": [], "authors": []}
+    assert user.get("/api/follows/overview").json() == {"series": [], "authors": [], "narrators": []}
     c.execute("UPDATE book SET wanted_by=?", (me,))
     from abw import notifications
     assert notifications.book_event("available", "Neu im Bestand", c.execute("SELECT * FROM book").fetchone()) == 0

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, ChevronDown, FolderInput, Info, Link2, Loader2, RotateCcw, Scissors, Search, Trash2, X } from 'lucide-react'
 import { api, fmtDateTime, useData, type Book } from '../api'
 import { SearchDialog } from '../SearchDialog'
+import { ManualImport } from '../ManualImport'
 import { ask, Badge, Button, Cover, Empty, ErrorBox, LangTag, Page, Tabs, UserTag } from '../ui'
 import { locale, t } from '../i18n'
 
@@ -21,11 +22,11 @@ interface Bundle {
   book_id: number; title: string; rel_path: string; lang: string; state: 'split' | 'done' | 'partial' | 'unsafe' | 'skipped'; message: string
   at: string; cover: string | null; children: { id: number; state: string; title: string; sequence: string | null }[]
 }
-interface Review { decide: Dl[]; unsure: Unsure[]; active: Dl[]; history: Dl[]; bundles: Bundle[]; counts: Record<Exclude<Tab, 'pairs'>, number> }
+interface Review { decide: Dl[]; unsure: Unsure[]; active: Dl[]; history: Dl[]; bundles: Bundle[]; counts: Record<Exclude<Tab, 'pairs' | 'manual'>, number> }
 interface Side { edition_id: number; series_id: number; name: string; lang: string; owned: number; count: number; hours: number; cover: string | null }
 interface Pair { score: number; why: string[]; de: Side; en: Side; rank: number }
 
-const TABS = { decide: t('Entscheiden'), unsure: t('Treffer wählen'), pairs: t('Sprachfassungen'), bundles: t('Sammelbände'), active: t('Unterwegs'), history: t('Verlauf') } as const
+const TABS = { decide: t('Entscheiden'), unsure: t('Treffer wählen'), pairs: t('Sprachfassungen'), bundles: t('Sammelbände'), active: t('Unterwegs'), history: t('Verlauf'), manual: t('Handimport') } as const
 type Tab = keyof typeof TABS
 
 const STATE: Record<string, { status: 'downloading' | 'review' | 'failed' | 'owned'; label: string }> = {
@@ -302,7 +303,7 @@ export default function ReviewPage() {
     if (last && last[0].de.edition_id === p.de.edition_id) last.push(p); else g.push([p])
     return g
   }, [])
-  const counts: Record<Tab, number> = { ...(data?.counts ?? { decide: 0, unsure: 0, active: 0, history: 0, bundles: 0 }), pairs: groups.length }
+  const counts: Record<Tab, number> = { ...(data?.counts ?? { decide: 0, unsure: 0, active: 0, history: 0, bundles: 0 }), pairs: groups.length, manual: 0 }
   if (error && !data) return <Page title={t('Prüfen')}><ErrorBox message={error} onRetry={reload} /></Page>
   if (!data) return <Page title={t('Prüfen')}><div className="skeleton h-64 rounded-2xl" /></Page>
   return (
@@ -359,6 +360,7 @@ export default function ReviewPage() {
       {tab === 'history' && (data.history.length === 0
         ? <Empty title={t('Noch kein Verlauf')} text={t('Abgelegte, defekte und verworfene Downloads werden hier aufgelistet.')} />
         : <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">{data.history.map(d => <Row key={d.id} d={d} onChange={reload} />)}</ul>)}
+      {tab === 'manual' && <ManualImport />}
       {pick && (
         <SearchDialog books={[{ id: pick.book_id, title: pick.title, sequence: pick.sequence } as Book]} initial={pick.book_id}
           onClose={() => setPick(null)} onStarted={reload} />

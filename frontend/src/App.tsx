@@ -15,8 +15,10 @@ import CalendarPage from './pages/CalendarPage'
 import TasksPage from './pages/TasksPage'
 import StatsPage from './pages/StatsPage'
 import ListeningPage from './pages/ListeningPage'
+import WrappedPage from './pages/WrappedPage'
 import SettingsPage from './pages/SettingsPage'
 import LoginPage from './pages/LoginPage'
+import { InvitePage } from './Invite'
 import NotificationsPage from './pages/NotificationsPage'
 import RatingsPage from './pages/RatingsPage'
 import ToReadPage from './pages/ToReadPage'
@@ -94,6 +96,8 @@ export default function App() {
     window.addEventListener('abw-unauthorized', out)
     return () => window.removeEventListener('abw-unauthorized', out)
   }, [])
+  const invite = window.location.pathname.match(/^\/einladung\/([\w-]+)$/)
+  if (invite) return <InvitePage code={invite[1]} />
   if (blocked) return <main className="flex min-h-dvh items-center justify-center p-6"><p role="alert" className="max-w-md rounded-2xl border border-line bg-surface p-6 text-sm">{blocked}</p></main>
   if (signedIn === null) return <div className="min-h-dvh" aria-busy="true" />
   if (!signedIn) return <LoginPage onDone={check} />
@@ -166,6 +170,7 @@ function Shell() {
             {admin && <Route path="/aufgaben" element={<TasksPage />} />}
             <Route path="/statistik" element={<StatsPage />} />
             <Route path="/hoerverlauf" element={<ListeningPage />} />
+            <Route path="/rueckblick" element={<WrappedPage />} />
             <Route path="/einstellungen" element={<SettingsPage />} />
             <Route path="*" element={<div className="p-8"><Empty title={t('Seite nicht gefunden')} text={t('Diese Adresse gibt es nicht. Über die Navigation kommst du zurück.')} /></div>} />
           </Routes>

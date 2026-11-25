@@ -3,6 +3,8 @@ import { KeyRound, Trash2 } from 'lucide-react'
 import { api, fmtDate, useData } from './api'
 import { Button, ErrorBox, ask } from './ui'
 import { t } from './i18n'
+import { useAdmin } from './session'
+import { Switch } from './Automation'
 
 interface Key { id: number; name: string; hint: string; created: string; last_used: string | null }
 
@@ -55,6 +57,24 @@ export function ApiKeys() {
           className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-bg px-3 text-sm" />
         <Button onClick={create}><KeyRound size={15} aria-hidden />{t('Schlüssel erstellen')}</Button>
       </div>
+      <Interfaces />
+    </div>
+  )
+}
+
+/** Wofür die Schlüssel gut sind: MCP-Server für KI-Assistenten und Kennzahlen; ändernde MCP-Werkzeuge schaltet der Administrator frei. */
+function Interfaces() {
+  const admin = useAdmin()
+  const { data, reload } = useData<{ write: boolean; tools: string[] }>(admin ? '/mcp/settings' : null)
+  const base = window.location.origin
+  return (
+    <div className="space-y-2 border-t border-line pt-3 text-sm text-muted">
+      <p>{t('MCP-Server für KI-Assistenten (Claude, Hermes):')} <code className="font-mono text-xs">{base}/api/mcp</code> {t('mit dem Kopf «Authorization: Bearer <Schlüssel>». Fragen wie «Was fehlt in Serie X?» oder «Was erscheint bald?».')}</p>
+      {admin && <p>{t('Kennzahlen für Prometheus:')} <code className="font-mono text-xs">{base}/api/metrics</code>{t(', für Home Assistant als JSON:')} <code className="font-mono text-xs">{base}/api/metrics.json</code></p>}
+      {admin && data && (
+        <Switch on={data.write} onChange={async v => { await api('/mcp/settings', { method: 'POST', body: JSON.stringify({ write: v }) }); reload() }}
+          label={t('KI darf Bücher hinzufügen')} hint={t('Schaltet das MCP-Werkzeug «add_wish» frei. Ohne bleibt der MCP-Server nur lesend.')} />
+      )}
     </div>
   )
 }

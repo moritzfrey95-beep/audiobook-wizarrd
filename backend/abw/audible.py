@@ -167,14 +167,35 @@ def sync_edition(edition_id: int) -> str:
             asin, kind = find_series_asin(lang, ed["name"], books) if books else (None, "absent")
             if not asin:
                 c.execute("UPDATE edition SET kind=? WHERE id=?", (kind, edition_id))
+                try:
+                    fill_runtimes(c, edition_id, lang)
+                except Exception:  # Meldung «keine Serie» behalten, Laufzeiten beim nächsten Lauf
+                    pass
                 raise LookupError(NO_SERIES[kind])
         _, children = series_children(lang, asin)
         _merge(c, ed, asin, children)
+        fill_runtimes(c, edition_id, lang)
         c.execute("UPDATE edition SET audible_asin=?, synced_at=?, sync_error=NULL, kind=NULL WHERE id=?", (asin, _now(), edition_id))
         return "ok"
     except Exception as exc:  # Fehler pro Serie festhalten, Lauf geht weiter
         c.execute("UPDATE edition SET synced_at=?, sync_error=? WHERE id=?", (_now(), str(exc)[:300], edition_id))
         return f"Fehler: {exc}"
+
+
+def fill_runtimes(c, edition_id: int, lang: str) -> int:
+    """Laufzeit laut Audible für Bücher im Bestand, die keine Serie liefert (Einzelbücher, Ausgabe ausserhalb
+    der Serienliste): einzeln über ihre ASIN abfragen. Ohne Wert vergleicht die Ankunftsprüfung nur mit dem Bestand."""
+    rows = c.execute("SELECT id, asin FROM book WHERE edition_id=? AND owned=1 AND audible_min IS NULL AND asin IS NOT NULL",
+                     (edition_id,)).fetchall()
+    by_asin = {r["asin"]: r["id"] for r in rows if ASIN_OK.match(r["asin"])}
+    if not by_asin:
+        return 0
+    n = 0
+    for p in products(lang, list(by_asin)):
+        if p.get("asin") in by_asin and p.get("runtime_length_min"):
+            c.execute("UPDATE book SET audible_min=? WHERE id=?", (p["runtime_length_min"], by_asin[p["asin"]]))
+            n += 1
+    return n
 
 
 def pick(cands: list[dict]) -> dict:

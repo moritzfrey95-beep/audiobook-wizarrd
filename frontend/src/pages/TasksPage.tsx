@@ -4,6 +4,7 @@ import { Button, ErrorBox, Page, Section } from '../ui'
 import { AutomationPanel } from '../Automation'
 import { CleanupPanel } from '../Cleanup'
 import { ConvertPanel } from '../Convert'
+import { UpgradePanel } from '../Upgrade'
 import { t } from '../i18n'
 
 interface Run { id: number; key: string; name: string; started: string; finished: string | null; status: string; message: string | null }
@@ -26,6 +27,7 @@ export default function TasksPage() {
   return (
     <Page title={t('Aufgaben')} subtitle={t('Zyklische Aufgaben laufen selbständig. Jede lässt sich auch sofort starten.')}>
       <Section title={t('Automatik')}><AutomationPanel /></Section>
+      <Section title={t('Qualitäts-Upgrade')}><UpgradePanel /></Section>
       <Section title={t('Zyklische Aufgaben')}>
         <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {data.tasks.map(tx => (
@@ -54,7 +56,7 @@ export default function TasksPage() {
       </Section>
       <Section title={t('Umwandlung und Kapitel')}><ConvertPanel /></Section>
       <Section title={t('Aufräumen')} hint={t('Download-Reste von Usenet und AudioBookBay')}><CleanupPanel /></Section>
-      <Section title={t('Geplante Aufgaben')} hint={t('Noch nicht gebaut')}>
+      {data.planned.length > 0 && <Section title={t('Geplante Aufgaben')} hint={t('Noch nicht gebaut')}>
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {data.planned.map(p => (
             <li key={p.key} className="rounded-xl border border-dashed border-line p-4">
@@ -66,7 +68,7 @@ export default function TasksPage() {
             </li>
           ))}
         </ul>
-      </Section>
+      </Section>}
       <Section title={t('Verlauf')} hint={t('Routineläufe ohne Fehler erscheinen nur einmal')}>
         <div className="overflow-x-auto rounded-xl border border-line bg-surface">
           <table className="w-full min-w-[640px] text-left text-sm">

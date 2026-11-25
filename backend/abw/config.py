@@ -64,6 +64,7 @@ FIELDS: dict[str, Field] = {
     "AUDIBLE_DELAY": Field("AUDIBLE_DELAY", "float", "0.35", "extra"),
     "WHISPER_MODEL": Field("WHISPER_MODEL", "str", "small", "extra"),
     "WHISPER_CACHE": Field("WHISPER_CACHE", "path", "", "extra"),  # Ordner mit schon geladenem Modell
+    "IMPORT_ROOT": Field("ABW_IMPORT_ROOT", "path", "/import", "extra"),  # Eingangsordner für den Handimport (nur lesend)
 }
 PREFIX = "cfg:"
 _stored: dict[str, str] = {}  # in der Datenbank gespeicherte Werte
